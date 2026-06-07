@@ -1,0 +1,21 @@
+# macOS
+.DS_Store
+
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+build/
+target/
+
+# Logs
+*.log
+
+# Local environment files
+.env
+.env.*
+
+# Separate registry repository
+fast-box-registry/
+
