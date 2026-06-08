@@ -709,6 +709,18 @@ pub(crate) fn run_system_verification_step(
     let bin_key = parts[0];
     let args = &parts[1..];
 
+    let dynamic_prefix = if bin_key == "node" && expected_prefix.is_some() {
+        crate::shims::detect_system_node_version().map(|sys_ver| format!("v{}", sys_ver))
+    } else {
+        None
+    };
+
+    let actual_expected_prefix = if let Some(ref dp) = dynamic_prefix {
+        Some(dp.as_str())
+    } else {
+        expected_prefix
+    };
+
     // 查找系统自带的二进制文件
     let bin_path = match crate::shims::find_system_binary(bin_key) {
         Ok(path) => path,
@@ -739,7 +751,7 @@ pub(crate) fn run_system_verification_step(
                 };
             }
 
-            if let Some(prefix) = expected_prefix {
+            if let Some(prefix) = actual_expected_prefix {
                 if !stdout.starts_with(prefix) {
                     return VerifyResult {
                         command: cmd_str.to_string(),
