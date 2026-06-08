@@ -10,6 +10,7 @@ use crate::system::get_fastbox_home;
 pub struct RegistryPackage {
     pub name: String,
     pub display_name: String,
+    pub default_version: String,
     pub versions: HashMap<String, VersionDetail>, // 键为版本号，用于获取 availableVersions
     pub bins: Vec<BinConfig>,
 }

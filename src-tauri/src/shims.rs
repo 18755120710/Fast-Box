@@ -5,8 +5,68 @@ use crate::registry::RegistryPackage;
 use crate::state::{read_active_state, write_active_state};
 use crate::system::{get_fastbox_home, get_os};
 
+pub fn find_system_binary(bin_name: &str) -> Result<PathBuf, String> {
+    let path_var = std::env::var("PATH").map_err(|e| format!("Failed to read PATH env: {}", e))?;
+    let paths = std::env::split_paths(&path_var);
+    let is_windows = get_os() == "windows";
+
+    for path in paths {
+        let path_str = path.to_string_lossy();
+        if path_str.contains(".fastbox/shims") || path_str.contains(".fastbox\\shims") || path_str.contains(".fastbox") {
+            continue;
+        }
+
+        if is_windows {
+            let extensions = ["", ".exe", ".cmd", ".bat", ".ps1"];
+            for ext in &extensions {
+                let full_name = format!("{}{}", bin_name, ext);
+                let candidate = path.join(&full_name);
+                if candidate.exists() && candidate.is_file() {
+                    return Ok(candidate);
+                }
+            }
+        } else {
+            let candidate = path.join(bin_name);
+            if candidate.exists() && candidate.is_file() {
+                #[cfg(unix)]
+                {
+                    use std::os::unix::fs::PermissionsExt;
+                    if let Ok(metadata) = fs::metadata(&candidate) {
+                        if metadata.permissions().mode() & 0o111 != 0 {
+                            return Ok(candidate);
+                        }
+                    }
+                }
+                #[cfg(not(unix))]
+                return Ok(candidate);
+            }
+        }
+    }
+
+    Err(format!("Fast Box: system binary '{}' not found in PATH", bin_name))
+}
+
+pub fn detect_system_node_version() -> Option<String> {
+    let node_path = find_system_binary("node").ok()?;
+    let output = std::process::Command::new(node_path)
+        .arg("--version")
+        .output()
+        .ok()?;
+
+    if output.status.success() {
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let version = stdout.trim().trim_start_matches('v').to_string();
+        if !version.is_empty() {
+            return Some(version);
+        }
+    }
+    None
+}
+
 pub fn activate_version(recipe: &RegistryPackage, version: &str) -> Result<(), String> {
-    ensure_version_installed(&recipe.name, version)?;
+    if version != "system" {
+        ensure_version_installed(&recipe.name, version)?;
+    }
 
     let mut state = read_active_state()?;
     state
@@ -38,6 +98,10 @@ pub fn resolve_active_binary(recipe: &RegistryPackage, bin_name: &str) -> Result
         .active
         .get(&recipe.name)
         .ok_or_else(|| format!("Fast Box: no active version set for {}", recipe.name))?;
+
+    if active_version == "system" {
+        return find_system_binary(bin_name);
+    }
 
     let bin_config = recipe
         .bins
@@ -71,6 +135,10 @@ pub fn resolve_active_binary(recipe: &RegistryPackage, bin_name: &str) -> Result
 }
 
 pub fn ensure_version_installed(name: &str, version: &str) -> Result<PathBuf, String> {
+    if version == "system" {
+        return Ok(PathBuf::new());
+    }
+
     let version_dir = get_fastbox_home()?
         .join("packages")
         .join(name)

@@ -11,7 +11,7 @@ use crate::registry::load_package_from_registry;
 use crate::download::download_with_retry;
 use crate::extract::extract_package;
 use crate::verify::verify_file_sha256;
-use crate::shims::{activate_version, refresh_package_shims};
+use crate::shims::{activate_version, refresh_package_shims, detect_system_node_version};
 
 // ==========================================
 // 数据结构定义
@@ -34,6 +34,7 @@ pub struct PackageStatus {
     pub active_version: Option<String>,
     pub available_versions: Vec<String>,
     pub status: String,
+    pub system_version: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -218,7 +219,12 @@ pub async fn list_packages(app_handle: tauri::AppHandle) -> Result<Vec<PackageSt
     let home = get_fastbox_home()?;
     let node_install_dir = home.join("packages").join("node");
 
+    let system_version = detect_system_node_version();
     let mut installed_versions = Vec::new();
+    if system_version.is_some() {
+        installed_versions.push("system".to_string());
+    }
+
     if node_install_dir.exists() && node_install_dir.is_dir() {
         if let Ok(entries) = fs::read_dir(node_install_dir) {
             for entry in entries.flatten() {
@@ -249,6 +255,7 @@ pub async fn list_packages(app_handle: tauri::AppHandle) -> Result<Vec<PackageSt
         active_version,
         available_versions,
         status,
+        system_version,
     }])
 }
 
@@ -313,6 +320,10 @@ pub async fn use_package_version(
 
 #[tauri::command]
 pub async fn uninstall_package_version(name: String, version: String) -> Result<(), String> {
+    if version == "system" {
+        return Err("Cannot uninstall system-provided package.".to_string());
+    }
+
     let state = crate::state::read_active_state()?;
     if let Some(active) = state.active.get(&name) {
         if active == &version {
@@ -343,19 +354,28 @@ pub async fn verify_package_version(
 ) -> Result<Vec<VerifyResult>, String> {
     let recipe = load_package_from_registry(&app_handle, &name)?;
     let home = get_fastbox_home()?;
-    let install_path = home.join("packages").join(&name).join(&version);
 
-    if !install_path.exists() {
-        return Err(format!("版本 {} 未安装", version));
-    }
+    let ref_version = if version == "system" {
+        &recipe.default_version
+    } else {
+        &version
+    };
 
-    let version_val = recipe.versions.get(&version)
-        .ok_or_else(|| format!("未在注册表中找到版本 {}", version))?;
+    let version_val = recipe.versions.get(ref_version)
+        .ok_or_else(|| format!("未在注册表中找到版本 {}", ref_version))?;
 
     let mut results = Vec::new();
     if let Some(verifications) = &version_val.verify {
         for config in verifications {
-            let res = run_verification_step(&recipe, &install_path, &config.command, config.expected_prefix.as_deref());
+            let res = if version == "system" {
+                run_system_verification_step(&recipe, &config.command, config.expected_prefix.as_deref())
+            } else {
+                let install_path = home.join("packages").join(&name).join(&version);
+                if !install_path.exists() {
+                    return Err(format!("版本 {} 未安装", version));
+                }
+                run_verification_step(&recipe, &install_path, &config.command, config.expected_prefix.as_deref())
+            };
             results.push(res);
         }
     }
@@ -623,6 +643,84 @@ pub(crate) fn run_verification_step(
             }
         }
     }
+
+    let mut command = std::process::Command::new(&bin_path);
+    command.args(args);
+
+    match command.output() {
+        Ok(output) => {
+            let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+            let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+
+            if !output.status.success() {
+                return VerifyResult {
+                    command: cmd_str.to_string(),
+                    success: false,
+                    output: stdout,
+                    error: Some(format!("退出状态码: {:?}. 错误输出: {}", output.status.code(), stderr)),
+                };
+            }
+
+            if let Some(prefix) = expected_prefix {
+                if !stdout.starts_with(prefix) {
+                    return VerifyResult {
+                        command: cmd_str.to_string(),
+                        success: false,
+                        output: stdout.clone(),
+                        error: Some(format!(
+                            "预期输出前缀为 '{}', 但实际得到: '{}'",
+                            prefix, stdout
+                        )),
+                    };
+                }
+            }
+
+            VerifyResult {
+                command: cmd_str.to_string(),
+                success: true,
+                output: stdout,
+                error: None,
+            }
+        }
+        Err(e) => VerifyResult {
+            command: cmd_str.to_string(),
+            success: false,
+            output: "".to_string(),
+            error: Some(format!("执行校验进程失败: {}", e)),
+        },
+    }
+}
+
+pub(crate) fn run_system_verification_step(
+    _recipe: &crate::registry::RegistryPackage,
+    cmd_str: &str,
+    expected_prefix: Option<&str>,
+) -> VerifyResult {
+    let parts: Vec<&str> = cmd_str.split_whitespace().collect();
+    if parts.is_empty() {
+        return VerifyResult {
+            command: cmd_str.to_string(),
+            success: false,
+            output: "".to_string(),
+            error: Some("空校验命令".to_string()),
+        };
+    }
+
+    let bin_key = parts[0];
+    let args = &parts[1..];
+
+    // 查找系统自带的二进制文件
+    let bin_path = match crate::shims::find_system_binary(bin_key) {
+        Ok(path) => path,
+        Err(e) => {
+            return VerifyResult {
+                command: cmd_str.to_string(),
+                success: false,
+                output: "".to_string(),
+                error: Some(e),
+            };
+        }
+    };
 
     let mut command = std::process::Command::new(&bin_path);
     command.args(args);

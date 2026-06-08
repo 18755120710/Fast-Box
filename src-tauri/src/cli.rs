@@ -1,11 +1,14 @@
 use std::fs;
 use std::process::{Command, Stdio};
 
-use crate::commands::{run_verification_step, PackageStatus, VerifyResult};
+use crate::commands::{run_verification_step, run_system_verification_step, PackageStatus, VerifyResult};
 use crate::download::download_with_retry;
 use crate::extract::extract_package;
 use crate::registry::{load_package_for_cli, RegistryPackage};
-use crate::shims::{activate_version, ensure_version_installed, refresh_package_shims, resolve_active_binary};
+use crate::shims::{
+    activate_version, ensure_version_installed, refresh_package_shims, resolve_active_binary,
+    detect_system_node_version,
+};
 use crate::state::get_active_version;
 use crate::system::{get_arch, get_fastbox_home, get_os, initialize_workspace};
 use crate::verify::verify_file_sha256;
@@ -91,7 +94,12 @@ fn list_packages_cli() -> Result<Vec<PackageStatus>, String> {
     let mut available_versions: Vec<String> = node_recipe.versions.keys().cloned().collect();
     available_versions.sort();
 
+    let system_version = detect_system_node_version();
     let mut installed_versions = Vec::new();
+    if system_version.is_some() {
+        installed_versions.push("system".to_string());
+    }
+
     let node_install_dir = get_fastbox_home()?.join("packages").join("node");
     if node_install_dir.exists() {
         for entry in fs::read_dir(&node_install_dir)
@@ -123,6 +131,7 @@ fn list_packages_cli() -> Result<Vec<PackageStatus>, String> {
         active_version: get_active_version("node"),
         available_versions,
         status,
+        system_version,
     }])
 }
 
@@ -164,22 +173,36 @@ async fn install_package_cli(name: &str, version: &str) -> Result<(), String> {
 
 fn verify_package_cli(name: &str, version: &str) -> Result<Vec<VerifyResult>, String> {
     let recipe = load_package_for_cli(name)?;
-    ensure_version_installed(name, version)?;
+    let ref_version = if version == "system" {
+        &recipe.default_version
+    } else {
+        ensure_version_installed(name, version)?;
+        version
+    };
+
     let version_detail = recipe
         .versions
-        .get(version)
-        .ok_or_else(|| format!("Version '{}' not found in registry package '{}'", version, name))?;
-    let install_dir = get_fastbox_home()?.join("packages").join(name).join(version);
+        .get(ref_version)
+        .ok_or_else(|| format!("Version '{}' not found in registry package '{}'", ref_version, name))?;
 
     let mut results = Vec::new();
     if let Some(verifications) = &version_detail.verify {
         for config in verifications {
-            results.push(run_verification_step(
-                &recipe,
-                &install_dir,
-                &config.command,
-                config.expected_prefix.as_deref(),
-            ));
+            if version == "system" {
+                results.push(run_system_verification_step(
+                    &recipe,
+                    &config.command,
+                    config.expected_prefix.as_deref(),
+                ));
+            } else {
+                let install_dir = get_fastbox_home()?.join("packages").join(name).join(version);
+                results.push(run_verification_step(
+                    &recipe,
+                    &install_dir,
+                    &config.command,
+                    config.expected_prefix.as_deref(),
+                ));
+            }
         }
     }
 
@@ -201,6 +224,10 @@ fn assert_verifications_pass(recipe: &RegistryPackage, version: &str) -> Result<
 }
 
 fn uninstall_package_cli(name: &str, version: &str) -> Result<(), String> {
+    if version == "system" {
+        return Err("Cannot uninstall system-provided package.".to_string());
+    }
+
     if get_active_version(name).as_deref() == Some(version) {
         return Err(format!(
             "{} {} is currently active. Switch to another version before uninstalling it.",
