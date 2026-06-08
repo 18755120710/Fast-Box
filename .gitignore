@@ -19,3 +19,9 @@ target/
 # Separate registry repository
 fast-box-registry/
 
+# E2E test fixtures and outputs
+tests/e2e/fixtures/
+
+# Agent metadata and skills
+.agents/
+.agent/
