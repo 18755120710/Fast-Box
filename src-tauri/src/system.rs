@@ -20,6 +20,13 @@ pub fn get_arch() -> String {
 
 /// 定位用户 Home 目录并构建 `.fastbox` 物理路径
 pub fn get_fastbox_home() -> Result<PathBuf, String> {
+    if let Ok(home) = std::env::var("FASTBOX_HOME") {
+        let trimmed = home.trim();
+        if !trimmed.is_empty() {
+            return Ok(PathBuf::from(trimmed));
+        }
+    }
+
     dirs::home_dir()
         .map(|h| h.join(".fastbox"))
         .ok_or_else(|| "Failed to locate user home directory".to_string())

@@ -10,7 +10,7 @@ import { generateFixtures } from './helpers/generate-fixtures';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const fixturesDir = path.resolve(__dirname, '../fixtures');
+const fixturesDir = path.resolve(__dirname, '../fixtures-infrastructure');
 const recipeTemplatePath = path.resolve(__dirname, '../../../fast-box-registry/packages/node.json');
 
 describe('E2E 测试基础设施验证', () => {

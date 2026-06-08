@@ -1,8 +1,21 @@
 use std::fs;
+use std::path::Path;
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
 use serde::{Deserialize, Serialize};
+use tauri::{Emitter, Manager};
+
 use crate::system::{get_os, get_arch, get_fastbox_home};
 use crate::state::get_active_version;
 use crate::registry::load_package_from_registry;
+use crate::download::download_with_retry;
+use crate::extract::extract_package;
+use crate::verify::verify_file_sha256;
+use crate::shims::{activate_version, refresh_package_shims};
+
+// ==========================================
+// 数据结构定义
+// ==========================================
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -32,6 +45,160 @@ pub struct VerifyResult {
     pub error: Option<String>,
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub enum TaskStatus {
+    Pending,
+    Downloading,
+    Extracting,
+    Verifying,
+    Completed,
+    Failed,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct TaskInfo {
+    pub task_id: String,
+    pub name: String,
+    pub version: String,
+    pub status: TaskStatus,
+    pub progress: u64, // 0 到 100 之间的百分比
+    pub logs: Vec<String>,
+}
+
+#[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct ProgressPayload {
+    task_id: String,
+    stage: String,
+    message: String,
+    status: String,
+    progress: u64,
+    downloaded: u64,
+    total: u64,
+}
+
+#[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct LogPayload {
+    task_id: String,
+    message: String,
+}
+
+// ==========================================
+// 任务状态管理器 (内存暂存与线程安全)
+// ==========================================
+
+#[derive(Clone)]
+pub struct TaskManager {
+    pub tasks: Arc<Mutex<HashMap<String, TaskInfo>>>,
+}
+
+impl TaskManager {
+    pub fn new() -> Self {
+        Self {
+            tasks: Arc::new(Mutex::new(HashMap::new())),
+        }
+    }
+
+    /// 初始化一个新任务
+    pub fn start_task(&self, task_id: String, name: String, version: String) {
+        let mut tasks = self.tasks.lock().unwrap();
+        tasks.insert(
+            task_id.clone(),
+            TaskInfo {
+                task_id,
+                name,
+                version,
+                status: TaskStatus::Pending,
+                progress: 0,
+                logs: vec!["[SYSTEM] 任务初始化成功".to_string()],
+            },
+        );
+    }
+
+    /// 更新任务状态及进度百分比
+    pub fn update_status(&self, task_id: &str, status: TaskStatus, progress: u64) {
+        let mut tasks = self.tasks.lock().unwrap();
+        if let Some(task) = tasks.get_mut(task_id) {
+            task.status = status;
+            task.progress = progress;
+        }
+    }
+
+    /// 往任务中追加一条日志信息并同时写入文件及发送 IPC 事件
+    pub fn add_log(&self, app_handle: &tauri::AppHandle, task_id: &str, log_msg: String) {
+        let (full_log, name, version) = {
+            let mut tasks = self.tasks.lock().unwrap();
+            if let Some(task) = tasks.get_mut(task_id) {
+                let timestamp = std::time::SystemTime::now()
+                    .duration_since(std::time::SystemTime::UNIX_EPOCH)
+                    .map(|d| {
+                        let secs = d.as_secs();
+                        let hour = (secs / 3600 + 8) % 24; // 简易北京时间
+                        let min = (secs / 60) % 60;
+                        let sec = secs % 60;
+                        format!("{:02}:{:02}:{:02}", hour, min, sec)
+                    })
+                    .unwrap_or_else(|_| "??:??:??".to_string());
+
+                let full_log = format!("[{}] {}", timestamp, log_msg);
+                println!("Task {}: {}", task_id, full_log); // 同步输出到控制台
+                task.logs.push(full_log.clone());
+                (full_log, task.name.clone(), task.version.clone())
+            } else {
+                return;
+            }
+        };
+
+        // 发送实时日志事件 (在锁外面)
+        let log_payload = LogPayload {
+            task_id: task_id.to_string(),
+            message: full_log.clone(),
+        };
+        let _ = app_handle.emit("install-log", log_payload);
+
+        // 写入本地日志文件 (在锁外面)
+        if let Ok(home) = get_fastbox_home() {
+            let log_file_name = format!("install-{}-{}.log", name, version);
+            let log_path = home.join("logs").join(log_file_name);
+            if let Ok(mut file) = std::fs::OpenOptions::new()
+                .create(true)
+                .write(true)
+                .append(true)
+                .open(&log_path)
+            {
+                use std::io::Write;
+                let _ = writeln!(file, "{}", full_log);
+            }
+        }
+    }
+
+    /// 获取任务日志
+    pub fn get_logs(&self, task_id: &str) -> Option<Vec<String>> {
+        let tasks = self.tasks.lock().unwrap();
+        tasks.get(task_id).map(|task| task.logs.clone())
+    }
+
+    /// 检查是否已有针对相同 name 和 version 的任务正处于活跃状态
+    pub fn is_task_active(&self, name: &str, version: &str) -> bool {
+        let tasks = self.tasks.lock().unwrap();
+        tasks.values().any(|t| {
+            t.name == name
+                && t.version == version
+                && (t.status == TaskStatus::Pending
+                    || t.status == TaskStatus::Downloading
+                    || t.status == TaskStatus::Verifying
+                    || t.status == TaskStatus::Extracting)
+        })
+    }
+}
+
+// ==========================================
+// Tauri Commands 实现
+// ==========================================
+
 #[tauri::command]
 pub async fn get_system_info() -> Result<SystemInfo, String> {
     let home_path = get_fastbox_home()?;
@@ -44,17 +211,13 @@ pub async fn get_system_info() -> Result<SystemInfo, String> {
 
 #[tauri::command]
 pub async fn list_packages(app_handle: tauri::AppHandle) -> Result<Vec<PackageStatus>, String> {
-    // 1. 读取包定义 (MVP 主要关注 node.json)
     let node_recipe = load_package_from_registry(&app_handle, "node")?;
-    
-    // 2. 从配方中提取可用版本
     let mut available_versions: Vec<String> = node_recipe.versions.keys().cloned().collect();
-    available_versions.sort(); // 按照版本排序
-    
-    // 3. 扫描本地 ~/.fastbox/packages/node/ 目录获取已安装的版本
+    available_versions.sort();
+
     let home = get_fastbox_home()?;
     let node_install_dir = home.join("packages").join("node");
-    
+
     let mut installed_versions = Vec::new();
     if node_install_dir.exists() && node_install_dir.is_dir() {
         if let Ok(entries) = fs::read_dir(node_install_dir) {
@@ -62,7 +225,6 @@ pub async fn list_packages(app_handle: tauri::AppHandle) -> Result<Vec<PackageSt
                 let path = entry.path();
                 if path.is_dir() {
                     if let Some(dir_name) = path.file_name().and_then(|n| n.to_str()) {
-                        // 过滤规则：首字母为数字代表版本目录
                         if dir_name.chars().next().map_or(false, |c| c.is_ascii_digit()) {
                             installed_versions.push(dir_name.to_string());
                         }
@@ -73,94 +235,475 @@ pub async fn list_packages(app_handle: tauri::AppHandle) -> Result<Vec<PackageSt
     }
     installed_versions.sort();
 
-    // 4. 获取当前激活的版本
     let active_version = get_active_version("node");
-
-    // 5. 确定当前包状态
     let status = if installed_versions.is_empty() {
         "not_installed".to_string()
     } else {
         "installed".to_string()
     };
 
-    // 6. 拼装结构体
-    let node_status = PackageStatus {
+    Ok(vec![PackageStatus {
         name: node_recipe.name,
         display_name: node_recipe.display_name,
         installed_versions,
         active_version,
         available_versions,
         status,
-    };
-
-    Ok(vec![node_status])
+    }])
 }
 
 #[tauri::command]
-pub async fn install_package_version(name: String, version: String) -> Result<String, String> {
-    // Stub implementation for M1 Setup
-    Ok(format!("task_{}_{}", name, version))
+pub async fn install_package_version(
+    app_handle: tauri::AppHandle,
+    task_manager: tauri::State<'_, TaskManager>,
+    name: String,
+    version: String,
+) -> Result<String, String> {
+    // 检查是否已有针对相同 name 和 version 的任务正处于活跃状态
+    if task_manager.is_task_active(&name, &version) {
+        return Err("该包版本正在安装中...".to_string());
+    }
+
+    // 生成唯一任务 ID: task_node_24.16.0_<timestamp>
+    let timestamp = std::time::SystemTime::now()
+        .duration_since(std::time::SystemTime::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    let task_id = format!("task_{}_{}_{}", name, version, timestamp);
+
+    // 在状态管理器中注册任务
+    task_manager.start_task(task_id.clone(), name.clone(), version.clone());
+
+    // 启动后台 Tokio 任务执行下载与安装
+    let task_id_clone = task_id.clone();
+    let app_handle_clone = app_handle.clone();
+
+    tokio::spawn(async move {
+        let task_manager = app_handle_clone.state::<TaskManager>();
+        if let Err(e) = run_install_pipeline(app_handle_clone.clone(), &task_id_clone, &name, &version).await {
+            task_manager.add_log(&app_handle_clone, &task_id_clone, format!("[ERROR] 安装失败: {}", e));
+            task_manager.update_status(&task_id_clone, TaskStatus::Failed, 0);
+
+            // 发送安装失败事件
+            let progress_payload = ProgressPayload {
+                task_id: task_id_clone.clone(),
+                stage: "failed".to_string(),
+                message: e.to_string(),
+                status: "failed".to_string(),
+                progress: 0,
+                downloaded: 0,
+                total: 0,
+            };
+            let _ = app_handle_clone.emit("install-progress", progress_payload);
+        }
+    });
+
+    Ok(task_id)
 }
 
 #[tauri::command]
-pub async fn use_package_version(name: String, version: String) -> Result<(), String> {
-    // Stub implementation: update active.json
-    let mut state = crate::state::read_active_state()?;
-    state.active.insert(name, version);
-    crate::state::write_active_state(&state)?;
-    Ok(())
+pub async fn use_package_version(
+    app_handle: tauri::AppHandle,
+    name: String,
+    version: String,
+) -> Result<(), String> {
+    let recipe = load_package_from_registry(&app_handle, &name)?;
+    activate_version(&recipe, &version)
 }
 
 #[tauri::command]
 pub async fn uninstall_package_version(name: String, version: String) -> Result<(), String> {
-    // Stub implementation: remove version from active if active, and delete directory
-    let mut state = crate::state::read_active_state()?;
+    let state = crate::state::read_active_state()?;
     if let Some(active) = state.active.get(&name) {
         if active == &version {
-            state.active.remove(&name);
-            crate::state::write_active_state(&state)?;
+            return Err(format!(
+                "{} {} is currently active. Switch to another version before uninstalling it.",
+                name, version
+            ));
         }
     }
     let home = get_fastbox_home()?;
     let version_dir = home.join("packages").join(&name).join(&version);
     if version_dir.exists() {
-        fs::remove_dir_all(version_dir).map_err(|e| e.to_string())?;
+        tokio::task::spawn_blocking(move || {
+            fs::remove_dir_all(version_dir)
+        })
+        .await
+        .map_err(|e| format!("Uninstall thread panicked: {}", e))?
+        .map_err(|e| e.to_string())?;
     }
     Ok(())
 }
 
 #[tauri::command]
-pub async fn verify_package_version(_name: String, version: String) -> Result<Vec<VerifyResult>, String> {
-    // Stub implementation
-    Ok(vec![
-        VerifyResult {
-            command: "node --version".to_string(),
-            success: true,
-            output: format!("v{}", version),
-            error: None,
-        },
-        VerifyResult {
-            command: "npm --version".to_string(),
-            success: true,
-            output: "10.0.0".to_string(),
-            error: None,
+pub async fn verify_package_version(
+    app_handle: tauri::AppHandle,
+    name: String,
+    version: String,
+) -> Result<Vec<VerifyResult>, String> {
+    let recipe = load_package_from_registry(&app_handle, &name)?;
+    let home = get_fastbox_home()?;
+    let install_path = home.join("packages").join(&name).join(&version);
+
+    if !install_path.exists() {
+        return Err(format!("版本 {} 未安装", version));
+    }
+
+    let version_val = recipe.versions.get(&version)
+        .ok_or_else(|| format!("未在注册表中找到版本 {}", version))?;
+
+    let mut results = Vec::new();
+    if let Some(verifications) = &version_val.verify {
+        for config in verifications {
+            let res = run_verification_step(&recipe, &install_path, &config.command, config.expected_prefix.as_deref());
+            results.push(res);
         }
-    ])
+    }
+
+    Ok(results)
 }
 
 #[tauri::command]
-pub async fn get_task_logs(task_id: String) -> Result<Vec<String>, String> {
-    // Stub implementation
-    Ok(vec![
-        format!("Log message for task {}", task_id),
-        "Initialization complete".to_string(),
-        "Downloading package node v24.16.0...".to_string(),
-        "Download finished successfully".to_string(),
-        "Extracting archive...".to_string(),
-        "Extraction finished successfully".to_string(),
-        "Updating symlinks in shim layer...".to_string(),
-        "Shim generation succeeded".to_string(),
-        "Verification: node --version: v24.16.0 (PASS)".to_string(),
-        "Install task completed successfully".to_string(),
-    ])
+pub async fn get_task_logs(
+    task_id: String,
+    task_manager: tauri::State<'_, TaskManager>,
+) -> Result<Vec<String>, String> {
+    task_manager
+        .get_logs(&task_id)
+        .ok_or_else(|| format!("未找到任务 ID 为 {} 的任务日志", task_id))
+}
+
+// ==========================================
+// 辅助逻辑函数
+// ==========================================
+
+/// 执行安装全流程：下载、校验、解压、移动、后置测试
+async fn run_install_pipeline(
+    app_handle: tauri::AppHandle,
+    task_id: &str,
+    name: &str,
+    version: &str,
+) -> Result<(), String> {
+    let task_manager = app_handle.state::<TaskManager>();
+
+    // 1. 读取注册表配方并匹配当前平台
+    task_manager.add_log(&app_handle, task_id, "正在读取软件包注册表信息...".to_string());
+    let recipe = load_package_from_registry(&app_handle, name)?;
+
+    let platform_config = recipe.get_platform_detail(version, &get_os(), &get_arch())?;
+
+    let home = get_fastbox_home()?;
+    let cache_dir = home.join("cache");
+    let dest_path = cache_dir.join(&platform_config.file_name);
+
+    // 收集所有候选 URL 列表 (官方链接 + 备选镜像链接)
+    let mut urls = vec![platform_config.official_url.clone()];
+    urls.extend(platform_config.mirror_urls.clone());
+
+    // 2. 检查本地缓存并验证以进行缓存复用
+    let mut need_download = true;
+    if dest_path.exists() {
+        task_manager.add_log(&app_handle, task_id, "检测到本地已存在同名缓存，正在进行 SHA256 完整性校验以复用缓存...".to_string());
+
+        let dest_path_clone = dest_path.clone();
+        let sha_expected = platform_config.sha256.clone();
+        let verify_cache_res = tokio::task::spawn_blocking(move || {
+            verify_file_sha256(&dest_path_clone, &sha_expected)
+        })
+        .await
+        .map_err(|e| format!("Verify thread panicked: {}", e))?;
+
+        match verify_cache_res {
+            Ok(_) => {
+                task_manager.add_log(&app_handle, task_id, "本地缓存校验通过，跳过下载阶段直接解包！".to_string());
+                need_download = false;
+            }
+            Err(_) => {
+                task_manager.add_log(&app_handle, task_id, "检测到本地残留同名损坏缓存，已自动清理损坏的缓存文件。".to_string());
+                // Note: verify_file_sha256 has already removed the file on failure
+            }
+        }
+    }
+
+    // 3. 执行下载流程
+    if need_download {
+        task_manager.update_status(task_id, TaskStatus::Downloading, 0);
+        task_manager.add_log(&app_handle, task_id, format!("开始下载软件包，候选 URL 共 {} 个", urls.len()));
+
+        let task_id_str = task_id.to_string();
+        let app_handle_cb = app_handle.clone();
+        let task_manager_cb = task_manager.inner().clone();
+
+        let progress_cb = move |downloaded: u64, total: u64| {
+            let percent = if total == 0 {
+                0
+            } else {
+                ((downloaded as f64 / total as f64) * 100.0) as u64
+            };
+            task_manager_cb.update_status(&task_id_str, TaskStatus::Downloading, percent);
+
+            let payload = ProgressPayload {
+                task_id: task_id_str.clone(),
+                stage: "downloading".to_string(),
+                message: format!("Downloaded {} of {} bytes", downloaded, total),
+                status: "downloading".to_string(),
+                progress: percent,
+                downloaded,
+                total,
+            };
+            let _ = app_handle_cb.emit("install-progress", payload);
+        };
+
+        download_with_retry(&urls, &dest_path, progress_cb).await?;
+        task_manager.add_log(&app_handle, task_id, "软件包下载成功。".to_string());
+    }
+
+    // 4. 进入哈希校验阶段 [Verifying]
+    task_manager.update_status(task_id, TaskStatus::Verifying, 90);
+    task_manager.add_log(&app_handle, task_id, "正在进行 SHA256 完整性校验...".to_string());
+
+    let dest_path_clone = dest_path.clone();
+    let sha_expected = platform_config.sha256.clone();
+    tokio::task::spawn_blocking(move || {
+        verify_file_sha256(&dest_path_clone, &sha_expected)
+    })
+    .await
+    .map_err(|e| format!("Verify thread panicked: {}", e))??;
+
+    task_manager.add_log(&app_handle, task_id, "SHA256 完整性校验通过。".to_string());
+
+    // 5. 执行解压阶段 [Extracting]
+    task_manager.update_status(task_id, TaskStatus::Extracting, 92);
+    task_manager.add_log(&app_handle, task_id, "正在解压缩并且平铺至安装目录...".to_string());
+
+    let install_dir = home.join("packages").join(name).join(version);
+    if install_dir.exists() {
+        task_manager.add_log(&app_handle, task_id, "发现已存在的同版本安装目录，正在清理旧目录...".to_string());
+        let install_dir_clone = install_dir.clone();
+        tokio::task::spawn_blocking(move || {
+            fs::remove_dir_all(&install_dir_clone)
+        })
+        .await
+        .map_err(|e| format!("清理旧安装目录线程 panic: {}", e))?
+        .map_err(|e| format!("清理旧安装目录失败: {}", e))?;
+    }
+
+    let dest_path_clone = dest_path.clone();
+    let install_dir_clone = install_dir.clone();
+    let archive_root_clone = platform_config.archive_root.clone();
+
+    let extract_res = tokio::task::spawn_blocking(move || {
+        extract_package(&dest_path_clone, &install_dir_clone, Some(&archive_root_clone))
+    })
+    .await
+    .map_err(|e| format!("Extract thread panicked: {}", e))?;
+
+    match extract_res {
+        Ok(_) => {
+            task_manager.add_log(&app_handle, task_id, format!("软件包解压成功，已平铺安装至: {:?}", install_dir));
+        }
+        Err(e) => {
+            return Err(format!("文件解压安装失败: {}", e));
+        }
+    }
+
+    // 6. 后置命令环境校验 [Verifying]
+    task_manager.update_status(task_id, TaskStatus::Verifying, 95);
+    task_manager.add_log(&app_handle, task_id, "开始执行后置环境校验...".to_string());
+
+    let version_detail = recipe.versions.get(version)
+        .ok_or_else(|| format!("未在配方中找到版本: {}", version))?;
+
+    if let Some(verifications) = &version_detail.verify {
+        for config in verifications {
+            task_manager.add_log(&app_handle, task_id, format!("运行校验命令: {}", config.command));
+
+            let recipe_clone = recipe.clone();
+            let install_dir_clone = install_dir.clone();
+            let command_clone = config.command.clone();
+            let expected_prefix_clone = config.expected_prefix.clone();
+
+            let v_res = tokio::task::spawn_blocking(move || {
+                run_verification_step(&recipe_clone, &install_dir_clone, &command_clone, expected_prefix_clone.as_deref())
+            })
+            .await
+            .map_err(|e| format!("Verification thread panicked: {}", e))?;
+
+            if v_res.success {
+                task_manager.add_log(&app_handle, task_id, format!("[PASS] -> 输出: {}", v_res.output));
+            } else {
+                let err_msg = v_res.error.unwrap_or_else(|| "未知执行错误".to_string());
+                return Err(format!("后置命令 '{}' 校验失败: {}", config.command, err_msg));
+            }
+        }
+    }
+
+    // 7. 创建 Shims。安装不会自动激活版本，切换由 use_package_version 完成。
+    task_manager.add_log(&app_handle, task_id, "正在创建 Shims 代理文件...".to_string());
+    refresh_package_shims(&recipe)?;
+    task_manager.add_log(&app_handle, task_id, "Shims 代理文件创建完成。".to_string());
+
+    // 8. 任务完成
+    task_manager.add_log(&app_handle, task_id, "[SYSTEM] 安装全流程校验通过，任务完成！".to_string());
+    task_manager.update_status(task_id, TaskStatus::Completed, 100);
+
+    // 触发 Tauri 前端安装状态更新事件通知
+    let completion_payload = ProgressPayload {
+        task_id: task_id.to_string(),
+        stage: "completed".to_string(),
+        message: "Install completed".to_string(),
+        status: "completed".to_string(),
+        progress: 100,
+        downloaded: 0,
+        total: 0,
+    };
+    let _ = app_handle.emit("install-progress", completion_payload);
+
+    Ok(())
+}
+
+/// 校验命令运行的具体实现
+pub(crate) fn run_verification_step(
+    recipe: &crate::registry::RegistryPackage,
+    install_path: &Path,
+    cmd_str: &str,
+    expected_prefix: Option<&str>,
+) -> VerifyResult {
+    let parts: Vec<&str> = cmd_str.split_whitespace().collect();
+    if parts.is_empty() {
+        return VerifyResult {
+            command: cmd_str.to_string(),
+            success: false,
+            output: "".to_string(),
+            error: Some("空校验命令".to_string()),
+        };
+    }
+
+    let bin_key = parts[0];
+    let args = &parts[1..];
+
+    let bin_config = recipe.bins.iter().find(|b| b.name == bin_key);
+    let relative_path = match bin_config {
+        Some(config) => {
+            if get_os() == "windows" {
+                config.windows_relative_path.as_deref().unwrap_or(&config.relative_path)
+            } else {
+                &config.relative_path
+            }
+        }
+        None => {
+            return VerifyResult {
+                command: cmd_str.to_string(),
+                success: false,
+                output: "".to_string(),
+                error: Some(format!("未在 bins 中找到名称为 '{}' 的二进制定义", bin_key)),
+            };
+        }
+    };
+
+    let bin_path = install_path.join(relative_path);
+    if !bin_path.exists() {
+        return VerifyResult {
+            command: cmd_str.to_string(),
+            success: false,
+            output: "".to_string(),
+            error: Some(format!("未在路径找到二进制文件: {:?}", bin_path)),
+        };
+    }
+
+    // Unix 平台，赋予可执行权限
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        if let Ok(metadata) = fs::metadata(&bin_path) {
+            let mut perms = metadata.permissions();
+            if perms.mode() & 0o111 == 0 {
+                perms.set_mode(perms.mode() | 0o111);
+                let _ = fs::set_permissions(&bin_path, perms);
+            }
+        }
+    }
+
+    let mut command = std::process::Command::new(&bin_path);
+    command.args(args);
+
+    match command.output() {
+        Ok(output) => {
+            let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+            let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+
+            if !output.status.success() {
+                return VerifyResult {
+                    command: cmd_str.to_string(),
+                    success: false,
+                    output: stdout,
+                    error: Some(format!("退出状态码: {:?}. 错误输出: {}", output.status.code(), stderr)),
+                };
+            }
+
+            if let Some(prefix) = expected_prefix {
+                if !stdout.starts_with(prefix) {
+                    return VerifyResult {
+                        command: cmd_str.to_string(),
+                        success: false,
+                        output: stdout.clone(),
+                        error: Some(format!(
+                            "预期输出前缀为 '{}', 但实际得到: '{}'",
+                            prefix, stdout
+                        )),
+                    };
+                }
+            }
+
+            VerifyResult {
+                command: cmd_str.to_string(),
+                success: true,
+                output: stdout,
+                error: None,
+            }
+        }
+        Err(e) => VerifyResult {
+            command: cmd_str.to_string(),
+            success: false,
+            output: "".to_string(),
+            error: Some(format!("执行校验进程失败: {}", e)),
+        },
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_task_manager_start_and_status() {
+        let manager = TaskManager::new();
+        let task_id = "task_test_1.0.0".to_string();
+        manager.start_task(task_id.clone(), "test".to_string(), "1.0.0".to_string());
+
+        let tasks = manager.tasks.lock().unwrap();
+        let task = tasks.get(&task_id).unwrap();
+        assert_eq!(task.name, "test");
+        assert_eq!(task.version, "1.0.0");
+        assert_eq!(task.status, TaskStatus::Pending);
+        assert_eq!(task.progress, 0);
+    }
+
+    #[test]
+    fn test_task_manager_active_checks() {
+        let manager = TaskManager::new();
+        assert!(!manager.is_task_active("node", "24.16.0"));
+
+        manager.start_task("task1".to_string(), "node".to_string(), "24.16.0".to_string());
+        assert!(manager.is_task_active("node", "24.16.0"));
+
+        manager.update_status("task1", TaskStatus::Downloading, 50);
+        assert!(manager.is_task_active("node", "24.16.0"));
+
+        manager.update_status("task1", TaskStatus::Completed, 100);
+        assert!(!manager.is_task_active("node", "24.16.0"));
+
+        manager.update_status("task1", TaskStatus::Failed, 0);
+        assert!(!manager.is_task_active("node", "24.16.0"));
+    }
 }

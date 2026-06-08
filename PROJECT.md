@@ -27,16 +27,16 @@ It manages local development toolchains (focusing on Node.js for MVP) in an isol
 
 | # | Name | Scope | Dependencies | Status | Conversation ID |
 |---|------|-------|-------------|--------|-----------------|
-| 1 | M1: Project Setup & UI | Setup Tauri React workspace, UI layout, system info, registry read | None | IN_PROGRESS | cc353806-c7a3-440e-bfd2-9d0230d53a08 |
-| 2 | M2: Download & Install | Implement package download with progress, SHA256 check, extract to ~/.fastbox | M1 | PLANNED | TBD |
-| 3 | M3: Shim & Switcher | Rust shim binary/scripts, active.json updates, version switcher command, verify installation | M2 | PLANNED | TBD |
-| 4 | M4: Uninstall & Config | Safe version deletion, active version warning, post-install configurations | M3 | PLANNED | TBD |
-| 5 | M5: E2E Integration | Full integration with E2E test suite, pass 100% tests | M4, E2E | PLANNED | TBD |
+| 1 | M1: Project Setup & UI | Setup Tauri React workspace, UI layout, system info, registry read | None | DONE | cc353806-c7a3-440e-bfd2-9d0230d53a08 |
+| 2 | M2: Download & Install | Implement package download with progress, SHA256 check, extract to ~/.fastbox | M1 | DONE | 4dbcdb51-6803-4883-bcab-d76f6a49402d |
+| 3 | M3: Shim & Switcher | Rust shim binary/scripts, active.json updates, version switcher command, verify installation | M2 | DONE | TBD |
+| 4 | M4: Uninstall & Config | Safe version deletion, active version warning, post-install configurations | M3 | DONE | TBD |
+| 5 | M5: E2E Integration | Full integration with E2E test suite, pass 100% tests | M4, E2E | DONE | TBD |
 | 6 | M6: Adversarial Hardening | Tier 5 white-box coverage hardening | M5 | PLANNED | TBD |
 
 ## E2E Testing Track
 The E2E Testing Track runs in parallel to design and implement an independent test runner/suite verifying requirements (Tiers 1-4).
-- Status: IN_PROGRESS
+- Status: DONE
 - Conversation ID: 010bff1b-6049-4a57-aa4c-f569a1b0b93a
 
 ## Interface Contracts
