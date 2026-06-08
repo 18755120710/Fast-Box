@@ -25,11 +25,19 @@ export const EnvDetail: React.FC<{ packageName: string }> = ({ packageName }) =>
     status: 'not_installed'
   };
 
-  const candidateVersions = pkg.availableVersions.map(v => ({
+  const candidateVersions = [...pkg.availableVersions.map(v => ({
     version: v,
     type: t('detail.lts'),
     codename: v === '24.16.0' ? 'Krypton' : t('detail.stable')
-  }));
+  }))];
+
+  if (pkg.systemVersion) {
+    candidateVersions.unshift({
+      version: 'system',
+      type: t('detail.system'),
+      codename: pkg.systemVersion
+    });
+  }
 
   const handleUseVersion = async (version: string) => {
     setLoadingAction(`use-${version}`);
@@ -150,7 +158,9 @@ export const EnvDetail: React.FC<{ packageName: string }> = ({ packageName }) =>
                 {/* 左侧元信息 */}
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
-                    <span className="text-sm font-bold text-slate-200">{cand.version}</span>
+                    <span className="text-sm font-bold text-slate-200">
+                      {cand.version === 'system' ? 'System (系统)' : cand.version}
+                    </span>
                     <span className="bg-slate-800 text-slate-400 px-2 py-0.5 rounded text-[9px] uppercase tracking-wider font-bold">
                       {cand.type}
                     </span>
@@ -200,16 +210,18 @@ export const EnvDetail: React.FC<{ packageName: string }> = ({ packageName }) =>
                       </button>
 
                       {/* 卸载版本 */}
-                      <button
-                        disabled={!!isLoading}
-                        onClick={() => handleUninstallVersion(cand.version)}
-                        className={`p-2 bg-slate-900 border border-slate-800 text-slate-400 hover:text-red-500 hover:border-red-500/30 rounded transition-colors duration-150 ${
-                          isLoading ? 'cursor-not-allowed' : 'cursor-pointer'
-                        }`}
-                        title={t('detail.uninstallTitle')}
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
+                      {cand.version !== 'system' && (
+                        <button
+                          disabled={!!isLoading}
+                          onClick={() => handleUninstallVersion(cand.version)}
+                          className={`p-2 bg-slate-900 border border-slate-800 text-slate-400 hover:text-red-500 hover:border-red-500/30 rounded transition-colors duration-150 ${
+                            isLoading ? 'cursor-not-allowed' : 'cursor-pointer'
+                          }`}
+                          title={t('detail.uninstallTitle')}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      )}
                     </>
                   ) : (
                     /* 一键下载安装 */

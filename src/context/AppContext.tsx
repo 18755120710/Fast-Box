@@ -17,6 +17,7 @@ export interface PackageStatus {
   activeVersion?: string;
   availableVersions: string[];
   status: string;
+  systemVersion?: string;
 }
 
 export interface TaskState {
