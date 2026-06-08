@@ -1,0 +1,17 @@
+{
+  "name": "fast-box-e2e",
+  "version": "1.0.0",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "vitest": "^1.6.0",
+    "execa": "^8.0.1",
+    "typescript": "^5.5.3",
+    "@types/node": "^20.11.0",
+    "fs-extra": "^11.2.0",
+    "@types/fs-extra": "^11.0.4"
+  }
+}
