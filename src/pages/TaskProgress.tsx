@@ -5,23 +5,23 @@ import { LogPanel } from '../components/LogPanel';
 import { CheckCircle2, AlertOctagon, Terminal } from 'lucide-react';
 
 export const TaskProgress: React.FC = () => {
-  const { activeTask, clearActiveTask } = useApp();
+  const { activeTask, clearActiveTask, t } = useApp();
 
   const isIdle = activeTask.status === 'idle';
 
   return (
     <div className="space-y-6 animate-fade-in font-mono text-xs">
       <div>
-        <h2 className="text-xl font-bold text-slate-100">Build & Install Task</h2>
+        <h2 className="text-xl font-bold text-slate-100">{t('task.title')}</h2>
         <p className="text-[10px] text-slate-500 mt-0.5">
-          Realtime status log of system binary configurations.
+          {t('task.description')}
         </p>
       </div>
 
       {isIdle ? (
         <div className="border border-slate-800 bg-slate-950 p-10 rounded text-center text-slate-500 space-y-3">
           <Terminal className="h-8 w-8 text-slate-600 mx-auto" />
-          <div>No active installation task in queue.</div>
+          <div>{t('task.noActive')}</div>
         </div>
       ) : (
         <div className="space-y-6">
@@ -32,7 +32,7 @@ export const TaskProgress: React.FC = () => {
                 {activeTask.packageName.toUpperCase()} @ {activeTask.version}
               </span>
               <span className="text-[10px] text-slate-500 font-mono">
-                Task ID: {activeTask.taskId || 'Registering...'}
+                {t('task.taskId')}: {activeTask.taskId || t('task.registering')}
               </span>
             </div>
 
@@ -47,7 +47,7 @@ export const TaskProgress: React.FC = () => {
               <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 text-accent rounded flex items-center gap-3 animate-fade-in">
                 <CheckCircle2 className="h-5 w-5" />
                 <div>
-                  <span className="font-bold">Installation Succeeded.</span> You can now switch to this version in the Environment details.
+                  <span className="font-bold">{t('task.successTitle')}</span> {t('task.successBody')}
                 </div>
               </div>
             )}
@@ -56,7 +56,7 @@ export const TaskProgress: React.FC = () => {
               <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-400 rounded flex items-center gap-3 animate-fade-in">
                 <AlertOctagon className="h-5 w-5" />
                 <div>
-                  <span className="font-bold">Installation Failed:</span> {activeTask.errorMessage}
+                  <span className="font-bold">{t('task.failedTitle')}</span> {activeTask.errorMessage}
                 </div>
               </div>
             )}
@@ -67,7 +67,7 @@ export const TaskProgress: React.FC = () => {
                   onClick={clearActiveTask}
                   className="px-3 py-1 bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-300 rounded font-bold cursor-pointer"
                 >
-                  Clear Task
+                  {t('task.clear')}
                 </button>
               </div>
             )}
@@ -75,7 +75,7 @@ export const TaskProgress: React.FC = () => {
 
           {/* 终端实时日志面板 */}
           <div className="space-y-2">
-            <h3 className="font-bold text-slate-400 uppercase tracking-wider text-[10px]">Real-time Stdout Streams</h3>
+            <h3 className="font-bold text-slate-400 uppercase tracking-wider text-[10px]">{t('task.streams')}</h3>
             <LogPanel logs={activeTask.logs} />
           </div>
         </div>

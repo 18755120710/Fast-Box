@@ -11,7 +11,7 @@ interface VerifyResult {
 }
 
 export const EnvDetail: React.FC<{ packageName: string }> = ({ packageName }) => {
-  const { packages, setCurrentTab, startInstall, refreshState } = useApp();
+  const { packages, setCurrentTab, startInstall, refreshState, t } = useApp();
   const [loadingAction, setLoadingAction] = useState<string | null>(null);
   const [verifyResults, setVerifyResults] = useState<VerifyResult[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -22,13 +22,13 @@ export const EnvDetail: React.FC<{ packageName: string }> = ({ packageName }) =>
     installedVersions: [],
     activeVersion: undefined,
     availableVersions: ['24.16.0'],
-    status: 'Not Installed'
+    status: 'not_installed'
   };
 
   const candidateVersions = pkg.availableVersions.map(v => ({
     version: v,
-    type: 'lts',
-    codename: v === '24.16.0' ? 'Krypton' : 'Stable'
+    type: t('detail.lts'),
+    codename: v === '24.16.0' ? 'Krypton' : t('detail.stable')
   }));
 
   const handleUseVersion = async (version: string) => {
@@ -39,14 +39,14 @@ export const EnvDetail: React.FC<{ packageName: string }> = ({ packageName }) =>
       await refreshState();
       setVerifyResults(null);
     } catch (err: any) {
-      setError(`Error switching version: ${err}`);
+      setError(t('detail.switchError', { error: String(err) }));
     } finally {
       setLoadingAction(null);
     }
   };
 
   const handleUninstallVersion = async (version: string) => {
-    if (!window.confirm(`Are you sure you want to uninstall ${packageName} v${version}?`)) {
+    if (!window.confirm(t('detail.confirmUninstall', { packageName, version }))) {
       return;
     }
     setLoadingAction(`uninstall-${version}`);
@@ -56,7 +56,7 @@ export const EnvDetail: React.FC<{ packageName: string }> = ({ packageName }) =>
       await refreshState();
       setVerifyResults(null);
     } catch (err: any) {
-      setError(`Error uninstalling version: ${err}`);
+      setError(t('detail.uninstallError', { error: String(err) }));
     } finally {
       setLoadingAction(null);
     }
@@ -69,7 +69,7 @@ export const EnvDetail: React.FC<{ packageName: string }> = ({ packageName }) =>
       const result = await invoke<VerifyResult[]>('verify_package_version', { name: packageName, version });
       setVerifyResults(result);
     } catch (err: any) {
-      setError(`Verification failed to execute: ${err}`);
+      setError(t('detail.verifyError', { error: String(err) }));
     } finally {
       setLoadingAction(null);
     }
@@ -86,8 +86,8 @@ export const EnvDetail: React.FC<{ packageName: string }> = ({ packageName }) =>
           <ArrowLeft className="h-4 w-4" />
         </button>
         <div>
-          <h2 className="text-xl font-bold text-slate-100">{pkg.displayName} Version Manager</h2>
-          <p className="text-[10px] text-slate-500 mt-0.5">Manage target compiler runtimes and run integrity checks.</p>
+          <h2 className="text-xl font-bold text-slate-100">{t('detail.title', { name: pkg.displayName })}</h2>
+          <p className="text-[10px] text-slate-500 mt-0.5">{t('detail.description')}</p>
         </div>
       </div>
 
@@ -98,7 +98,7 @@ export const EnvDetail: React.FC<{ packageName: string }> = ({ packageName }) =>
             onClick={() => setError(null)} 
             className="text-[10px] underline hover:text-red-400 cursor-pointer"
           >
-            Dismiss
+            {t('common.dismiss')}
           </button>
         </div>
       )}
@@ -109,13 +109,13 @@ export const EnvDetail: React.FC<{ packageName: string }> = ({ packageName }) =>
           <div className="flex justify-between items-center">
             <h3 className="font-bold text-slate-200 flex items-center gap-2">
               <ShieldCheck className="h-4 w-4 text-accent" />
-              INTEGRITY VERIFICATION REPORT
+              {t('detail.reportTitle')}
             </h3>
             <button
               onClick={() => setVerifyResults(null)}
               className="text-[10px] text-slate-500 hover:text-slate-300 underline cursor-pointer"
             >
-              Dismiss
+              {t('common.dismiss')}
             </button>
           </div>
           <div className="space-y-2">
@@ -126,7 +126,7 @@ export const EnvDetail: React.FC<{ packageName: string }> = ({ packageName }) =>
                   <div className="text-[10px] text-slate-500 whitespace-pre-wrap">{v.output || v.error}</div>
                 </div>
                 <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${v.success ? 'bg-accent/10 border border-accent/20 text-accent' : 'bg-red-500/10 border border-red-500/20 text-red-500'}`}>
-                  {v.success ? 'PASS' : 'FAIL'}
+                  {v.success ? t('common.pass') : t('common.fail')}
                 </span>
               </div>
             ))}
@@ -137,7 +137,7 @@ export const EnvDetail: React.FC<{ packageName: string }> = ({ packageName }) =>
       {/* 版本列表卡片 */}
       <div className="border border-slate-800 bg-slate-950 rounded overflow-hidden">
         <div className="bg-slate-900 border-b border-slate-800 px-5 py-3 text-slate-300 font-bold">
-          AVAILABLE & INSTALLED VERSIONS
+          {t('detail.versionListTitle')}
         </div>
         <div className="divide-y divide-slate-900">
           {candidateVersions.map((cand) => {
@@ -159,12 +159,12 @@ export const EnvDetail: React.FC<{ packageName: string }> = ({ packageName }) =>
                   <div className="text-[10px] text-slate-500 font-mono">
                     {isActive ? (
                       <span className="text-accent flex items-center gap-1.5">
-                        <CheckCircle2 className="h-3.5 w-3.5" /> Shim activated globally
+                        <CheckCircle2 className="h-3.5 w-3.5" /> {t('detail.shimActivated')}
                       </span>
                     ) : isInstalled ? (
-                      'Installed, inactive'
+                      t('detail.installedInactive')
                     ) : (
-                      'Remote version available to download'
+                      t('detail.remoteAvailable')
                     )}
                   </div>
                 </div>
@@ -185,7 +185,7 @@ export const EnvDetail: React.FC<{ packageName: string }> = ({ packageName }) =>
                             : 'bg-accent hover:bg-accent-hover text-slate-950'
                         }`}
                       >
-                        {isLoading && loadingAction?.startsWith('use') ? 'Activating...' : 'Activate'}
+                        {isLoading && loadingAction?.startsWith('use') ? t('detail.activating') : t('detail.activate')}
                       </button>
 
                       {/* 健康校验 */}
@@ -196,7 +196,7 @@ export const EnvDetail: React.FC<{ packageName: string }> = ({ packageName }) =>
                           isLoading ? 'cursor-not-allowed' : 'cursor-pointer'
                         }`}
                       >
-                        {isLoading && loadingAction?.startsWith('verify') ? 'Verifying...' : 'Verify'}
+                        {isLoading && loadingAction?.startsWith('verify') ? t('detail.verifying') : t('detail.verify')}
                       </button>
 
                       {/* 卸载版本 */}
@@ -206,7 +206,7 @@ export const EnvDetail: React.FC<{ packageName: string }> = ({ packageName }) =>
                         className={`p-2 bg-slate-900 border border-slate-800 text-slate-400 hover:text-red-500 hover:border-red-500/30 rounded transition-colors duration-150 ${
                           isLoading ? 'cursor-not-allowed' : 'cursor-pointer'
                         }`}
-                        title="Uninstall version"
+                        title={t('detail.uninstallTitle')}
                       >
                         <Trash2 className="h-3.5 w-3.5" />
                       </button>
@@ -220,7 +220,7 @@ export const EnvDetail: React.FC<{ packageName: string }> = ({ packageName }) =>
                         isLoading ? 'cursor-not-allowed' : 'cursor-pointer'
                       }`}
                     >
-                      {isLoading ? 'Pending...' : 'Download & Install'}
+                      {isLoading ? t('detail.pending') : t('detail.downloadInstall')}
                     </button>
                   )}
                 </div>

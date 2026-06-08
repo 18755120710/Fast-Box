@@ -1,11 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Copy, Terminal, Check, ArrowDown } from 'lucide-react';
+import { useApp } from '../context/AppContext';
 
 interface LogPanelProps {
   logs: string[];
 }
 
 export const LogPanel: React.FC<LogPanelProps> = ({ logs }) => {
+  const { t } = useApp();
   const [filterText, setFilterText] = useState('');
   const [copied, setCopied] = useState(false);
   const [autoScroll, setAutoScroll] = useState(true);
@@ -41,16 +43,16 @@ export const LogPanel: React.FC<LogPanelProps> = ({ logs }) => {
       <div className="flex items-center justify-between px-4 py-2 bg-slate-900 border-b border-slate-800 select-none">
         <div className="flex items-center gap-2 text-slate-400">
           <Terminal className="h-3.5 w-3.5 text-accent" />
-          <span>CONSOLE LOGS</span>
+          <span>{t('logs.title')}</span>
           <span className="text-[10px] bg-slate-800 px-1.5 py-0.5 rounded text-slate-400">
-            {filteredLogs.length} lines
+            {t('common.lines', { count: filteredLogs.length })}
           </span>
         </div>
         <div className="flex items-center gap-2">
           {/* 过滤搜索 */}
           <input
             type="text"
-            placeholder="Filter logs..."
+            placeholder={t('logs.filter')}
             value={filterText}
             onChange={(e) => setFilterText(e.target.value)}
             className="bg-slate-950 border border-slate-800 rounded px-2 py-0.5 text-[10px] text-slate-300 focus:outline-none focus:border-accent w-32 transition-colors duration-150"
@@ -59,7 +61,7 @@ export const LogPanel: React.FC<LogPanelProps> = ({ logs }) => {
           <button
             onClick={handleCopy}
             className="p-1 hover:bg-slate-800 rounded text-slate-400 hover:text-slate-200 transition-colors duration-150 cursor-pointer"
-            title="Copy all logs"
+            title={t('logs.copyTitle')}
           >
             {copied ? <Check className="h-3.5 w-3.5 text-accent" /> : <Copy className="h-3.5 w-3.5" />}
           </button>
@@ -74,7 +76,7 @@ export const LogPanel: React.FC<LogPanelProps> = ({ logs }) => {
       >
         {filteredLogs.length === 0 ? (
           <div className="h-full flex items-center justify-center text-slate-600">
-            No logs to display
+            {t('logs.empty')}
           </div>
         ) : (
           filteredLogs.map((log, index) => {
@@ -104,7 +106,7 @@ export const LogPanel: React.FC<LogPanelProps> = ({ logs }) => {
           onClick={() => setAutoScroll(true)}
           className="absolute bottom-6 right-6 bg-slate-800 border border-slate-700 text-slate-300 hover:text-white px-2.5 py-1 rounded-full text-[10px] flex items-center gap-1 shadow-lg cursor-pointer"
         >
-          <ArrowDown className="h-3 w-3" /> Auto Scroll
+          <ArrowDown className="h-3 w-3" /> {t('logs.autoScroll')}
         </button>
       )}
     </div>

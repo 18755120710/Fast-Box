@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
+import { createTranslator, getInitialLanguage, Language } from '../i18n';
 
 // 接口类型定义
 export interface SystemInfo {
@@ -35,6 +36,9 @@ interface AppContextType {
   systemInfo: SystemInfo | null;
   packages: PackageStatus[];
   activeTask: TaskState;
+  language: Language;
+  setLanguage: (language: Language) => void;
+  t: ReturnType<typeof createTranslator>;
   refreshState: () => Promise<void>;
   startInstall: (packageName: string, version: string) => Promise<void>;
   clearActiveTask: () => void;
@@ -46,6 +50,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [currentTab, setCurrentTab] = useState<string>('home');
   const [systemInfo, setSystemInfo] = useState<SystemInfo | null>(null);
   const [packages, setPackages] = useState<PackageStatus[]>([]);
+  const [language, setLanguageState] = useState<Language>(() => getInitialLanguage());
   const [activeTask, setActiveTask] = useState<TaskState>({
     taskId: '',
     packageName: '',
@@ -55,6 +60,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     logs: [],
     status: 'idle'
   });
+  const t = createTranslator(language);
+
+  const setLanguage = (nextLanguage: Language) => {
+    localStorage.setItem('fastbox.language', nextLanguage);
+    setLanguageState(nextLanguage);
+  };
 
   const refreshState = async () => {
     try {
@@ -161,7 +172,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         version,
         stage: 'Initializing',
         progress: 0,
-        logs: [`Starting installation for ${packageName} @ ${version}...`],
+        logs: [t('task.startingInstall', { package: packageName, version })],
         status: 'running'
       });
       setCurrentTab('progress');
@@ -174,7 +185,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         ...prev,
         status: 'failed',
         errorMessage: err.toString(),
-        logs: [...prev.logs, `[Error] ${err}`].slice(-1000)
+        logs: [...prev.logs, t('task.errorLog', { error: String(err) })].slice(-1000)
       }));
     }
   };
@@ -199,6 +210,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         systemInfo,
         packages,
         activeTask,
+        language,
+        setLanguage,
+        t,
         refreshState,
         startInstall,
         clearActiveTask

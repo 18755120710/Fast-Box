@@ -1,4 +1,5 @@
 import React from 'react';
+import { useApp } from '../context/AppContext';
 
 interface ProgressBarProps {
   progress: number; // 0 到 100
@@ -7,6 +8,8 @@ interface ProgressBarProps {
 }
 
 export const ProgressBar: React.FC<ProgressBarProps> = ({ progress, stage, status }) => {
+  const { t } = useApp();
+
   const getStatusColor = () => {
     switch (status) {
       case 'success':
@@ -28,7 +31,7 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({ progress, stage, statu
               <span className="relative inline-flex rounded-full h-2 w-2 bg-accent"></span>
             </span>
           )}
-          <span className="text-slate-300 font-semibold">{stage || 'Preparing...'}</span>
+          <span className="text-slate-300 font-semibold">{stage || t('progress.preparing')}</span>
         </div>
         <span className={`font-bold ${status === 'failed' ? 'text-red-500' : 'text-accent'}`}>{progress}%</span>
       </div>
@@ -43,8 +46,8 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({ progress, stage, statu
 
       {/* 底部详细辅助文本 */}
       <div className="flex justify-between items-center mt-1.5 text-[10px] text-slate-500">
-        <span>Status: {status.toUpperCase()}</span>
-        {status === 'running' && <span>Do not close the application</span>}
+        <span>{t('progress.status')}: {status.toUpperCase()}</span>
+        {status === 'running' && <span>{t('progress.doNotClose')}</span>}
       </div>
     </div>
   );

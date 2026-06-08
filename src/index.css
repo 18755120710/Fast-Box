@@ -8,7 +8,7 @@
   body {
     background-color: #0F172A;
     color: #F8FAFC;
-    font-family: 'Space Mono', ui-monospace, monospace;
+    font-family: 'Space Mono', 'PingFang SC', 'Microsoft YaHei', ui-monospace, monospace;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
