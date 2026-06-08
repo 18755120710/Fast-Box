@@ -1,0 +1,15 @@
+{
+  "$schema": "../schemas/capability.json",
+  "identifier": "default",
+  "description": "Default permissions for Fast Box",
+  "windows": ["main"],
+  "permissions": [
+    "core:path:default",
+    "core:event:default",
+    "core:app:default",
+    "core:resources:default",
+    "core:menu:default",
+    "core:window:default",
+    "shell:default"
+  ]
+}
