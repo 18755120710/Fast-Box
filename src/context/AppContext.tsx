@@ -79,6 +79,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  const mapBackendStatus = (backendStatus: string | undefined, progress: number): 'idle' | 'running' | 'success' | 'failed' => {
+    if (!backendStatus) {
+      return progress === 100 ? 'success' : 'running';
+    }
+    switch (backendStatus) {
+      case 'completed':
+      case 'success':
+        return 'success';
+      case 'failed':
+        return 'failed';
+      case 'running':
+      case 'downloading':
+      case 'extracting':
+      case 'verifying':
+      default:
+        return progress === 100 ? 'success' : 'running';
+    }
+  };
+
   useEffect(() => {
     let isMounted = true;
     let cleanupProgress: (() => void) | null = null;
@@ -87,11 +106,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     refreshState();
 
     // 监听全局包安装进度事件
-    const unlistenProgress = listen<{ taskId: string; stage: string; progress: number; message: string; packageName?: string }>(
+    const unlistenProgress = listen<{ taskId: string; stage: string; progress: number; message: string; packageName?: string; status?: string }>(
       'install-progress',
       (event) => {
         if (!isMounted) return;
-        const { taskId, stage, progress, message, packageName } = event.payload;
+        const { taskId, stage, progress, message, packageName, status } = event.payload;
         setActiveTask((prev) => {
           const isMatch = prev.taskId === taskId || (
             !prev.taskId && prev.packageName && (
@@ -101,12 +120,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             )
           );
           if (isMatch) {
+            const mappedStatus = mapBackendStatus(status, progress);
             return {
               ...prev,
               taskId: prev.taskId || taskId,
               stage,
               progress,
-              status: progress === 100 ? 'success' : 'running',
+              status: mappedStatus,
+              errorMessage: mappedStatus === 'failed' ? message : prev.errorMessage,
               logs: [...prev.logs, `[${stage}] ${message}`].slice(-1000)
             };
           }

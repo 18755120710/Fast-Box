@@ -4,6 +4,7 @@ use std::io::{self, Read};
 use tar::Archive;
 use zip::ZipArchive;
 use xz2::read::XzDecoder;
+use flate2::read::GzDecoder;
 use thiserror::Error;
 
 /// 解压缩和安装过程中可能出现的异常错误定义
@@ -41,6 +42,7 @@ pub enum ExtractError {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ArchiveType {
     TarXz,
+    TarGz,
     Zip,
 }
 
@@ -54,6 +56,8 @@ impl ArchiveType {
 
         if filename.ends_with(".tar.xz") || filename.ends_with(".txz") {
             Ok(ArchiveType::TarXz)
+        } else if filename.ends_with(".tar.gz") || filename.ends_with(".tgz") {
+            Ok(ArchiveType::TarGz)
         } else if filename.ends_with(".zip") {
             Ok(ArchiveType::Zip)
         } else {
@@ -158,8 +162,9 @@ pub fn extract_package(
 
     // 4. 执行对应的解压逻辑
     let extract_result = match archive_type {
-        ArchiveType::TarXz => extract_tar_xz(archive_path, &temp_dir, archive_root),
-        ArchiveType::Zip => extract_zip(archive_path, &temp_dir, archive_root),
+      ArchiveType::TarXz => extract_tar_xz(archive_path, &temp_dir, archive_root),
+      ArchiveType::TarGz => extract_tar_gz(archive_path, &temp_dir, archive_root),
+      ArchiveType::Zip => extract_zip(archive_path, &temp_dir, archive_root),
     };
 
     // 5. 错误处理与清理
@@ -174,15 +179,13 @@ pub fn extract_package(
     Ok(())
 }
 
-/// Tar.xz 格式解压缩实现
-fn extract_tar_xz(
-    archive_path: &Path,
+/// 统一的 Tar 格式解压实现
+fn extract_tar_reader<R: Read>(
+    reader: R,
     target_dir: &Path,
     archive_root: Option<&str>,
 ) -> Result<(), ExtractError> {
-    let file = File::open(archive_path)?;
-    let decompressor = XzDecoder::new(file);
-    let mut archive = Archive::new(decompressor);
+    let mut archive = Archive::new(reader);
 
     if let Some(root_prefix) = archive_root {
         let root_path = Path::new(root_prefix);
@@ -267,6 +270,28 @@ fn extract_tar_xz(
     }
 
     Ok(())
+}
+
+/// Tar.xz 格式解压缩实现
+fn extract_tar_xz(
+    archive_path: &Path,
+    target_dir: &Path,
+    archive_root: Option<&str>,
+) -> Result<(), ExtractError> {
+    let file = File::open(archive_path)?;
+    let decompressor = XzDecoder::new(file);
+    extract_tar_reader(decompressor, target_dir, archive_root)
+}
+
+/// Tar.gz 格式解压缩实现
+fn extract_tar_gz(
+    archive_path: &Path,
+    target_dir: &Path,
+    archive_root: Option<&str>,
+) -> Result<(), ExtractError> {
+    let file = File::open(archive_path)?;
+    let decompressor = GzDecoder::new(file);
+    extract_tar_reader(decompressor, target_dir, archive_root)
 }
 
 /// Zip 格式解压缩实现

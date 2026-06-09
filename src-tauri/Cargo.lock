@@ -864,6 +864,7 @@ name = "fast-box"
 version = "0.1.0"
 dependencies = [
  "dirs 5.0.1",
+ "flate2",
  "futures-util",
  "log",
  "reqwest 0.12.28",

@@ -20,7 +20,7 @@ export const LogPanel: React.FC<LogPanelProps> = ({ logs }) => {
 
   useEffect(() => {
     if (autoScroll && logEndRef.current) {
-      logEndRef.current.scrollIntoView({ behavior: 'smooth' });
+      logEndRef.current.scrollIntoView({ behavior: 'auto' });
     }
   }, [logs, autoScroll]);
 
@@ -32,7 +32,8 @@ export const LogPanel: React.FC<LogPanelProps> = ({ logs }) => {
 
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
     const target = e.currentTarget;
-    const isAtBottom = target.scrollHeight - target.scrollTop <= target.clientHeight + 10;
+    // 增加缓冲判定高度到 35px，并采用 auto 即时滚动以规避 smooth 动画造成的 onScroll 误判
+    const isAtBottom = target.scrollHeight - target.scrollTop <= target.clientHeight + 35;
     setAutoScroll(isAtBottom);
   };
 
