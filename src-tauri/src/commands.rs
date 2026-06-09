@@ -981,15 +981,15 @@ pub async fn get_settings() -> Result<crate::config::AppSettings, String> {
     Ok(crate::config::read_settings())
 }
 
-fn expand_path(p: &str) -> PathBuf {
+fn expand_path(p: &str) -> std::path::PathBuf {
     let home_dir_str = dirs::home_dir()
         .map(|h| h.to_string_lossy().to_string())
         .unwrap_or_default();
     let expanded = p.replace("~", &home_dir_str);
-    PathBuf::from(expanded)
+    std::path::PathBuf::from(expanded)
 }
 
-fn copy_dir_all(src: impl AsRef<Path>, dst: impl AsRef<Path>) -> Result<(), String> {
+fn copy_dir_all(src: impl AsRef<std::path::Path>, dst: impl AsRef<std::path::Path>) -> Result<(), String> {
     fs::create_dir_all(&dst).map_err(|e| format!("创建目标目录失败: {}", e))?;
     for entry in fs::read_dir(src).map_err(|e| format!("读取源目录失败: {}", e))? {
         let entry = entry.map_err(|e| format!("读取目录条目失败: {}", e))?;
@@ -1004,7 +1004,7 @@ fn copy_dir_all(src: impl AsRef<Path>, dst: impl AsRef<Path>) -> Result<(), Stri
     Ok(())
 }
 
-fn migrate_workspace(old_dir: &Path, new_dir: &Path) -> Result<(), String> {
+fn migrate_workspace(old_dir: &std::path::Path, new_dir: &std::path::Path) -> Result<(), String> {
     if old_dir == new_dir {
         return Ok(());
     }
@@ -1057,7 +1057,7 @@ pub struct StorageUsage {
     pub total_size: u64,
 }
 
-fn get_dir_size<P: AsRef<Path>>(path: P) -> u64 {
+fn get_dir_size<P: AsRef<std::path::Path>>(path: P) -> u64 {
     let mut size = 0;
     if let Ok(entries) = fs::read_dir(path) {
         for entry in entries.flatten() {
@@ -1182,8 +1182,6 @@ pub async fn is_path_configured_in_shell() -> Result<bool, String> {
     let home = get_fastbox_home()?;
     let shims_dir = home.join("shims");
     let shims_dir_str = shims_dir.to_string_lossy().to_string();
-
-    let shell_var = std::env::var("SHELL").unwrap_or_default();
     let config_files = vec![
         dirs::home_dir().map(|h| h.join(".zshrc")),
         dirs::home_dir().map(|h| h.join(".bash_profile")),
