@@ -29,9 +29,10 @@ interface StorageUsage {
 }
 
 export const Home: React.FC = () => {
-  const { systemInfo, packages, setCurrentTab, refreshState, t } = useApp();
+  const { systemInfo, packages, setCurrentTab, refreshState, t, language } = useApp();
   const [activities, setActivities] = useState<ActivityItem[]>([]);
   const [pathMissing, setPathMissing] = useState<boolean>(true);
+  const [isConfiguredInRc, setIsConfiguredInRc] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(false);
   
   // 新增：存储大小与清理状态
@@ -65,6 +66,8 @@ export const Home: React.FC = () => {
       setActivities(acts);
       const pathOk = await invoke<boolean>('check_path_status');
       setPathMissing(!pathOk);
+      const configOk = await invoke<boolean>('is_path_configured_in_shell');
+      setIsConfiguredInRc(configOk);
       await loadStorageData();
     } catch (err) {
       console.error('Failed to load dashboard metrics:', err);
@@ -381,27 +384,44 @@ export const Home: React.FC = () => {
           {/* 智能环境变量配置诊断与写入 */}
           <div className="border-t border-slate-100 pt-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 animate-fade-in">
             <div className="flex items-start gap-3">
-              <Terminal className={`h-4.5 w-4.5 ${pathMissing ? 'text-amber-500' : 'text-emerald-500'} mt-0.5 flex-shrink-0`} />
+              <Terminal className={`h-4.5 w-4.5 ${
+                !pathMissing ? 'text-emerald-500' : isConfiguredInRc ? 'text-blue-500' : 'text-amber-500'
+              } mt-0.5 flex-shrink-0`} />
               <div>
                 <div className="flex items-center gap-2">
-                  <span className={`font-semibold ${pathMissing ? 'text-amber-600' : 'text-emerald-600'}`}>
+                  <span className={`font-semibold ${
+                    !pathMissing ? 'text-emerald-600' : isConfiguredInRc ? 'text-blue-600' : 'text-amber-600'
+                  }`}>
                     {t('home.pathDiagnostic')}
                   </span>
-                  <span className={`px-2 py-0.5 rounded text-[8px] font-bold ${pathMissing ? 'bg-amber-50 border border-amber-200 text-amber-600' : 'bg-emerald-50 border border-emerald-200 text-emerald-600'}`}>
-                    {pathMissing ? t('home.warning') : 'OK'}
+                  <span className={`px-2 py-0.5 rounded text-[8px] font-bold ${
+                    !pathMissing 
+                      ? 'bg-emerald-50 border border-emerald-200 text-emerald-600' 
+                      : isConfiguredInRc 
+                        ? 'bg-blue-50 border border-blue-200 text-blue-600' 
+                        : 'bg-amber-50 border border-amber-200 text-amber-600'
+                  }`}>
+                    {!pathMissing ? 'OK' : isConfiguredInRc ? 'CONFIGURED' : t('home.warning')}
                   </span>
                 </div>
                 <p className="text-[9px] text-slate-500 mt-0.5 leading-relaxed max-w-md">
-                  {pathMissing ? t('home.pathDiagnosticErr') : t('home.pathDiagnosticOk')}
+                  {!pathMissing 
+                    ? t('home.pathDiagnosticOk') 
+                    : isConfiguredInRc 
+                      ? (language === 'zh' 
+                          ? '环境变量已写入配置文件，请重启终端或应用以激活全局代理命令。' 
+                          : 'Environment variables written. Please restart your terminal/app to apply changes.') 
+                      : t('home.pathDiagnosticErr')
+                  }
                 </p>
               </div>
             </div>
 
-            {pathMissing && (
+            {pathMissing && !isConfiguredInRc && (
               <button
                 disabled={configLoading}
                 onClick={handleAutoConfig}
-                className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg font-bold shadow-sm transition-all duration-150 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg font-bold shadow-sm transition-all duration-150 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
               >
                 {configLoading ? t('settings.saving') : t('home.autoPathConfig')}
               </button>

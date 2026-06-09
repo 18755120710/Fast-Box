@@ -981,8 +981,68 @@ pub async fn get_settings() -> Result<crate::config::AppSettings, String> {
     Ok(crate::config::read_settings())
 }
 
+fn expand_path(p: &str) -> PathBuf {
+    let home_dir_str = dirs::home_dir()
+        .map(|h| h.to_string_lossy().to_string())
+        .unwrap_or_default();
+    let expanded = p.replace("~", &home_dir_str);
+    PathBuf::from(expanded)
+}
+
+fn copy_dir_all(src: impl AsRef<Path>, dst: impl AsRef<Path>) -> Result<(), String> {
+    fs::create_dir_all(&dst).map_err(|e| format!("创建目标目录失败: {}", e))?;
+    for entry in fs::read_dir(src).map_err(|e| format!("读取源目录失败: {}", e))? {
+        let entry = entry.map_err(|e| format!("读取目录条目失败: {}", e))?;
+        let ty = entry.file_type().map_err(|e| format!("获取文件类型失败: {}", e))?;
+        let dest_path = dst.as_ref().join(entry.file_name());
+        if ty.is_dir() {
+            copy_dir_all(entry.path(), dest_path)?;
+        } else {
+            fs::copy(entry.path(), dest_path).map_err(|e| format!("复制文件失败: {}", e))?;
+        }
+    }
+    Ok(())
+}
+
+fn migrate_workspace(old_dir: &Path, new_dir: &Path) -> Result<(), String> {
+    if old_dir == new_dir {
+        return Ok(());
+    }
+    if !old_dir.exists() {
+        return Ok(());
+    }
+    if let Some(parent) = new_dir.parent() {
+        if !parent.exists() {
+            fs::create_dir_all(parent).map_err(|e| format!("无法创建工作空间父目录: {}", e))?;
+        }
+    }
+    let subdirs = vec!["packages", "shims", "state", "cache", "logs", "registry"];
+    for subdir in subdirs {
+        let src = old_dir.join(subdir);
+        let dst = new_dir.join(subdir);
+        if src.exists() {
+            if dst.exists() {
+                let _ = fs::remove_dir_all(&dst);
+            }
+            if let Err(_) = fs::rename(&src, &dst) {
+                copy_dir_all(&src, &dst)?;
+                let _ = fs::remove_dir_all(&src);
+            }
+        }
+    }
+    Ok(())
+}
+
 #[tauri::command]
 pub async fn save_settings(settings: crate::config::AppSettings) -> Result<(), String> {
+    let old_settings = crate::config::read_settings();
+    let old_path = expand_path(&old_settings.workspace_path);
+    let new_path = expand_path(&settings.workspace_path);
+
+    if old_path.exists() && old_path != new_path {
+        migrate_workspace(&old_path, &new_path)?;
+    }
+
     crate::config::write_settings(&settings)?;
     let _ = crate::system::initialize_workspace();
     Ok(())
@@ -1115,6 +1175,31 @@ pub async fn auto_configure_path() -> Result<String, String> {
         "已成功将 PATH 追加配置到 ~/{}. 请重启当前运行的所有终端（或运行 'source ~/{}'）以激活全局代理命令！",
         file_name, file_name
     ))
+}
+
+#[tauri::command]
+pub async fn is_path_configured_in_shell() -> Result<bool, String> {
+    let home = get_fastbox_home()?;
+    let shims_dir = home.join("shims");
+    let shims_dir_str = shims_dir.to_string_lossy().to_string();
+
+    let shell_var = std::env::var("SHELL").unwrap_or_default();
+    let config_files = vec![
+        dirs::home_dir().map(|h| h.join(".zshrc")),
+        dirs::home_dir().map(|h| h.join(".bash_profile")),
+        dirs::home_dir().map(|h| h.join(".bashrc")),
+    ];
+
+    for config_file in config_files.into_iter().flatten() {
+        if config_file.exists() {
+            if let Ok(content) = fs::read_to_string(&config_file) {
+                if content.contains(".fastbox/shims") || content.contains(&shims_dir_str) {
+                    return Ok(true);
+                }
+            }
+        }
+    }
+    Ok(false)
 }
 
 #[tauri::command]

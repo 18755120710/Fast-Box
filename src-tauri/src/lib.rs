@@ -63,6 +63,7 @@ pub fn run() {
             commands::clean_logs,
             commands::auto_configure_path,
             commands::select_workspace_dir,
+            commands::is_path_configured_in_shell,
         ])
 
 
