@@ -259,11 +259,58 @@ fn uninstall_package_cli(name: &str, version: &str) -> Result<(), String> {
         return Err("Cannot uninstall system-provided package.".to_string());
     }
 
-    if get_active_version(name).as_deref() == Some(version) {
-        return Err(format!(
-            "{} {} is currently active. Switch to another version before uninstalling it.",
-            name, version
-        ));
+    let mut state = crate::state::read_active_state()?;
+    let is_active = state.active.get(name).map_or(false, |v| v == version);
+
+    if is_active {
+        let home = get_fastbox_home()?;
+        let install_dir = home.join("packages").join(name);
+        let mut installed = Vec::new();
+        
+        if name == "node" && detect_system_node_version().is_some() {
+            installed.push("system".to_string());
+        }
+
+        if install_dir.exists() && install_dir.is_dir() {
+            if let Ok(entries) = fs::read_dir(&install_dir) {
+                for entry in entries.flatten() {
+                    let path = entry.path();
+                    if path.is_dir() {
+                        if let Some(dir_name) = path.file_name().and_then(|n| n.to_str()) {
+                            if dir_name != version && dir_name.chars().next().map_or(false, |c| c.is_ascii_digit()) {
+                                installed.push(dir_name.to_string());
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        if !installed.is_empty() {
+            installed.sort();
+            let fallback = &installed[0];
+            let recipe = load_package_for_cli(name)?;
+            activate_version(&recipe, fallback)?;
+            println!("Warning: Uninstalled active version v{}, auto-switched to v{}.", version, fallback);
+        } else {
+            state.active.remove(name);
+            crate::state::write_active_state(&state)?;
+            
+            if let Ok(recipe) = load_package_for_cli(name) {
+                let shims_dir = home.join("shims");
+                for bin in &recipe.bins {
+                    let shim_path = if get_os() == "windows" {
+                        shims_dir.join(format!("{}.cmd", bin.name))
+                    } else {
+                        shims_dir.join(&bin.name)
+                    };
+                    if shim_path.exists() {
+                        let _ = fs::remove_file(shim_path);
+                    }
+                }
+            }
+            println!("Warning: Uninstalled active version v{} and cleared active version settings.", version);
+        }
     }
 
     let version_dir = get_fastbox_home()?.join("packages").join(name).join(version);
@@ -272,12 +319,9 @@ fn uninstall_package_cli(name: &str, version: &str) -> Result<(), String> {
             .map_err(|e| format!("Failed to uninstall {} {}: {}", name, version, e))?;
     }
 
-    if let Ok(recipe) = load_package_for_cli(name) {
-        refresh_package_shims(&recipe)?;
-    }
-
     Ok(())
 }
+
 
 fn two_args<'a>(args: &'a [String], command: &str) -> Result<(&'a str, &'a str), String> {
     if args.len() != 3 {

@@ -1,4 +1,5 @@
 mod system;
+mod config;
 mod state;
 mod registry;
 mod commands;
@@ -53,7 +54,13 @@ pub fn run() {
             commands::uninstall_package_version,
             commands::verify_package_version,
             commands::get_task_logs,
+            commands::get_settings,
+            commands::save_settings,
+            commands::get_recent_activities,
+            commands::check_path_status,
         ])
+
+
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

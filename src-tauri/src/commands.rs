@@ -333,20 +333,78 @@ pub async fn use_package_version(
 }
 
 #[tauri::command]
-pub async fn uninstall_package_version(name: String, version: String) -> Result<(), String> {
+pub async fn uninstall_package_version(
+    app_handle: tauri::AppHandle,
+    name: String,
+    version: String,
+) -> Result<String, String> {
     if version == "system" {
         return Err("Cannot uninstall system-provided package.".to_string());
     }
 
-    let state = crate::state::read_active_state()?;
-    if let Some(active) = state.active.get(&name) {
-        if active == &version {
-            return Err(format!(
-                "{} {} is currently active. Switch to another version before uninstalling it.",
-                name, version
-            ));
+    let mut state = crate::state::read_active_state()?;
+    let is_active = state.active.get(&name).map_or(false, |v| v == &version);
+    let transition_message: String;
+
+    if is_active {
+        // Find other installed versions
+        let home = get_fastbox_home()?;
+        let install_dir = home.join("packages").join(&name);
+        let mut installed = Vec::new();
+        
+        // Check if system node exists
+        if name == "node" && crate::shims::detect_system_node_version().is_some() {
+            installed.push("system".to_string());
         }
+
+        if install_dir.exists() && install_dir.is_dir() {
+            if let Ok(entries) = fs::read_dir(&install_dir) {
+                for entry in entries.flatten() {
+                    let path = entry.path();
+                    if path.is_dir() {
+                        if let Some(dir_name) = path.file_name().and_then(|n| n.to_str()) {
+                            if dir_name != version && dir_name.chars().next().map_or(false, |c| c.is_ascii_digit()) {
+                                installed.push(dir_name.to_string());
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        if !installed.is_empty() {
+            installed.sort();
+            let fallback = &installed[0]; // e.g. system
+            
+            // Auto switch active version to fallback
+            let recipe = crate::registry::load_package_from_registry(&app_handle, &name)?;
+            crate::shims::activate_version(&recipe, fallback)?;
+            transition_message = format!("已卸载当前激活的版本 v{}，已自动为您重定向切换至 v{} 版本以保证开发环境可用。", version, fallback);
+        } else {
+            // Clear active version since no versions left
+            state.active.remove(&name);
+            crate::state::write_active_state(&state)?;
+            
+            // Delete/refresh shims
+            if let Ok(recipe) = crate::registry::load_package_from_registry(&app_handle, &name) {
+                let shims_dir = home.join("shims");
+                for bin in &recipe.bins {
+                    let shim_path = if get_os() == "windows" {
+                        shims_dir.join(format!("{}.cmd", bin.name))
+                    } else {
+                        shims_dir.join(&bin.name)
+                    };
+                    if shim_path.exists() {
+                        let _ = fs::remove_file(shim_path);
+                    }
+                }
+            }
+            transition_message = format!("已卸载当前激活的版本 v{}，目前已无其它可用版本，对应的全局 Shim 代理命令已自动清理。", version);
+        }
+    } else {
+        transition_message = format!("成功卸载包 {} 的 v{} 版本。", name, version);
     }
+
     let home = get_fastbox_home()?;
     let version_dir = home.join("packages").join(&name).join(&version);
     if version_dir.exists() {
@@ -357,8 +415,10 @@ pub async fn uninstall_package_version(name: String, version: String) -> Result<
         .map_err(|e| format!("Uninstall thread panicked: {}", e))?
         .map_err(|e| e.to_string())?;
     }
-    Ok(())
+
+    Ok(transition_message)
 }
+
 
 #[tauri::command]
 pub async fn verify_package_version(
@@ -793,6 +853,130 @@ pub(crate) fn run_system_verification_step(
             error: Some(format!("执行校验进程失败: {}", e)),
         },
     }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct ActivityItem {
+    pub title: String,
+    pub description: String,
+    pub time_ago: String,
+    pub status: String, // "success" | "failed" | "running"
+}
+
+#[tauri::command]
+pub async fn get_recent_activities() -> Result<Vec<ActivityItem>, String> {
+    let home = get_fastbox_home()?;
+    let logs_dir = home.join("logs");
+    if !logs_dir.exists() || !logs_dir.is_dir() {
+        return Ok(vec![]);
+    }
+
+    let mut items = Vec::new();
+    if let Ok(entries) = fs::read_dir(logs_dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_file() && path.extension().map_or(false, |ext| ext == "log") {
+                if let Some(file_name) = path.file_name().and_then(|n| n.to_str()) {
+                    if file_name.starts_with("install-") {
+                        let name_part = &file_name["install-".len()..];
+                        let parts: Vec<&str> = name_part.split('-').collect();
+                        if parts.len() >= 2 {
+                            let pkg_name = parts[0];
+                            let version_ext = parts[1];
+                            let version = version_ext.trim_end_matches(".log");
+
+                            let metadata = fs::metadata(&path).map_err(|e| e.to_string())?;
+                            let modified = metadata.modified().map_err(|e| e.to_string())?;
+                            let duration = std::time::SystemTime::now()
+                                .duration_since(modified)
+                                .unwrap_or_else(|_| std::time::Duration::from_secs(0));
+                            
+                            let mins = duration.as_secs() / 60;
+                            let time_ago = if mins < 1 {
+                                "刚刚".to_string()
+                            } else if mins < 60 {
+                                format!("{} 分钟前", mins)
+                            } else if mins < 1440 {
+                                format!("{} 小时前", mins / 60)
+                            } else {
+                                format!("{} 天前", mins / 1440)
+                            };
+
+                            let status = if let Ok(content) = fs::read_to_string(&path) {
+                                if content.contains("[SYSTEM] 安装全流程校验通过") || content.contains("completed") {
+                                    "success".to_string()
+                                } else if content.contains("[ERROR]") || content.contains("failed") {
+                                    "failed".to_string()
+                                } else {
+                                    "running".to_string()
+                                }
+                            } else {
+                                "success".to_string()
+                            };
+
+                            let title = format!("安装 {} v{}", pkg_name, version);
+                            let description = if status == "success" {
+                                format!("软件包 {} v{} 下载、校验并解压安装成功", pkg_name, version)
+                            } else if status == "failed" {
+                                format!("软件包 {} v{} 安装失败，详情请查看日志文件", pkg_name, version)
+                            } else {
+                                format!("正在执行 {} v{} 的安装流程", pkg_name, version)
+                            };
+
+                            items.push((modified, ActivityItem {
+                                title,
+                                description,
+                                time_ago,
+                                status,
+                            }));
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    items.sort_by(|a, b| b.0.cmp(&a.0));
+    let result: Vec<ActivityItem> = items.into_iter().map(|(_, item)| item).take(5).collect();
+    Ok(result)
+}
+
+#[tauri::command]
+pub async fn check_path_status() -> Result<bool, String> {
+    let path_var = match std::env::var("PATH") {
+        Ok(v) => v,
+        Err(_) => return Ok(false),
+    };
+
+    let home = get_fastbox_home()?;
+    let shims_dir = home.join("shims");
+    let shims_dir_str = shims_dir.to_string_lossy().to_string();
+
+    let paths = std::env::split_paths(&path_var);
+    for path in paths {
+        let path_str = path.to_string_lossy().to_string();
+        if path_str == shims_dir_str {
+            return Ok(true);
+        }
+        if path_str.contains(".fastbox/shims") || path_str.contains(".fastbox\\shims") {
+            return Ok(true);
+        }
+    }
+
+    Ok(false)
+}
+
+#[tauri::command]
+pub async fn get_settings() -> Result<crate::config::AppSettings, String> {
+    Ok(crate::config::read_settings())
+}
+
+#[tauri::command]
+pub async fn save_settings(settings: crate::config::AppSettings) -> Result<(), String> {
+    crate::config::write_settings(&settings)?;
+    let _ = crate::system::initialize_workspace();
+    Ok(())
 }
 
 #[cfg(test)]

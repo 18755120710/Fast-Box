@@ -1,4 +1,5 @@
 use std::path::PathBuf;
+use serde_json;
 
 /// 获取操作系统，统一映射为小写格式
 pub fn get_os() -> String {
@@ -27,10 +28,28 @@ pub fn get_fastbox_home() -> Result<PathBuf, String> {
         }
     }
 
-    dirs::home_dir()
+    let default_home = dirs::home_dir()
         .map(|h| h.join(".fastbox"))
-        .ok_or_else(|| "Failed to locate user home directory".to_string())
+        .ok_or_else(|| "Failed to locate user home directory".to_string())?;
+
+    let config_path = default_home.join("config.json");
+    if config_path.exists() {
+        if let Ok(content) = std::fs::read_to_string(&config_path) {
+            if let Ok(settings) = serde_json::from_str::<serde_json::Value>(&content) {
+                if let Some(workspace_val) = settings.get("workspacePath").and_then(|v| v.as_str()) {
+                    let home_dir_str = dirs::home_dir()
+                        .map(|h| h.to_string_lossy().to_string())
+                        .unwrap_or_default();
+                    let expanded = workspace_val.replace("~", &home_dir_str);
+                    return Ok(PathBuf::from(expanded));
+                }
+            }
+        }
+    }
+
+    Ok(default_home)
 }
+
 
 /// 应用启动的前置校验：初始化所需目录树
 pub fn initialize_workspace() -> Result<PathBuf, String> {
