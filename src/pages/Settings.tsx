@@ -11,7 +11,7 @@ export const Settings: React.FC = () => {
   const [localLanguage, setLocalLanguage] = useState<'en' | 'zh'>('zh');
   const [copied, setCopied] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [saveStatus, setSaveStatus] = useState<'success' | 'error' | null>(null);
+  const [saveStatus, setSaveStatus] = useState<'success' | 'error' | 'info' | null>(null);
   const [errorMessage, setErrorMessage] = useState('');
 
   useEffect(() => {
@@ -90,13 +90,19 @@ export const Settings: React.FC = () => {
           <label className="text-slate-500 font-medium block">{t('settings.languageLabel')}</label>
           <div className="inline-flex rounded-lg border border-slate-200 bg-slate-100 p-0.5 shadow-inner">
             <button
-              onClick={() => setLocalLanguage('en')}
+              onClick={() => {
+                setLocalLanguage('en');
+                setLanguage('en');
+              }}
               className={`px-3 py-1.5 rounded-md text-[10px] font-bold transition-all duration-150 cursor-pointer ${localLanguage === 'en' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
             >
               {t('settings.english')}
             </button>
             <button
-              onClick={() => setLocalLanguage('zh')}
+              onClick={() => {
+                setLocalLanguage('zh');
+                setLanguage('zh');
+              }}
               className={`px-3 py-1.5 rounded-md text-[10px] font-bold transition-all duration-150 cursor-pointer ${localLanguage === 'zh' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
             >
               {t('settings.chinese')}
@@ -121,7 +127,11 @@ export const Settings: React.FC = () => {
               className="flex-1 bg-white border border-slate-200 rounded-lg px-3 py-2 text-slate-800 placeholder-slate-400 focus:outline-none focus:border-slate-800 focus:ring-1 focus:ring-slate-800 transition-all duration-150 shadow-sm text-xs font-mono"
             />
             <button 
-              onClick={() => alert(localLanguage === 'zh' ? '请直接在输入框中输入工作区绝对路径。' : 'Please input the absolute workspace path directly in the text box.')}
+              onClick={() => {
+                setSaveStatus('info');
+                setErrorMessage(localLanguage === 'zh' ? '当前环境暂不支持文件夹选择器，请直接在输入框中输入工作区绝对路径（例如 ~/.fastbox）。' : 'Direct folder browser is not supported in this environment, please input the absolute path manually (e.g. ~/.fastbox).');
+                setTimeout(() => setSaveStatus(null), 6000);
+              }}
               className="px-3.5 py-2 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-300 rounded-lg font-bold text-xs cursor-pointer shadow-sm transition-colors duration-150"
             >
               {t('settings.browse')}
@@ -241,6 +251,12 @@ export const Settings: React.FC = () => {
           {saveStatus === 'error' && (
             <p className="text-rose-600 font-bold text-[10px]">
               {t('settings.saveFailed', { error: errorMessage })}
+            </p>
+          )}
+          {saveStatus === 'info' && (
+            <p className="text-indigo-600 font-bold flex items-center gap-1.5 animate-fade-in text-[10px]">
+              <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 inline-block animate-pulse"></span>
+              {errorMessage}
             </p>
           )}
           {!saveStatus && (
