@@ -1117,6 +1117,20 @@ pub async fn auto_configure_path() -> Result<String, String> {
     ))
 }
 
+#[tauri::command]
+pub async fn select_workspace_dir() -> Result<Option<String>, String> {
+    let res = tokio::task::spawn_blocking(move || {
+        rfd::FileDialog::new().pick_folder()
+    })
+    .await
+    .map_err(|e| format!("选择工作区目录线程异常: {}", e))?;
+
+    match res {
+        Some(path) => Ok(Some(path.to_string_lossy().to_string())),
+        None => Ok(None),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

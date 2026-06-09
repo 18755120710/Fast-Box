@@ -72,6 +72,18 @@ export const Settings: React.FC = () => {
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const handleBrowse = async () => {
+    try {
+      const selected = await invoke<string | null>('select_workspace_dir');
+      if (selected) {
+        setWorkspace(selected);
+      }
+    } catch (err: any) {
+      setSaveStatus('error');
+      setErrorMessage(String(err));
+    }
+  };
+
   return (
     <div className="space-y-6 animate-fade-in font-sans text-xs">
       <div>
@@ -127,11 +139,7 @@ export const Settings: React.FC = () => {
               className="flex-1 bg-white border border-slate-200 rounded-lg px-3 py-2 text-slate-800 placeholder-slate-400 focus:outline-none focus:border-slate-800 focus:ring-1 focus:ring-slate-800 transition-all duration-150 shadow-sm text-xs font-mono"
             />
             <button 
-              onClick={() => {
-                setSaveStatus('info');
-                setErrorMessage(localLanguage === 'zh' ? '当前环境暂不支持文件夹选择器，请直接在输入框中输入工作区绝对路径（例如 ~/.fastbox）。' : 'Direct folder browser is not supported in this environment, please input the absolute path manually (e.g. ~/.fastbox).');
-                setTimeout(() => setSaveStatus(null), 6000);
-              }}
+              onClick={handleBrowse}
               className="px-3.5 py-2 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-300 rounded-lg font-bold text-xs cursor-pointer shadow-sm transition-colors duration-150"
             >
               {t('settings.browse')}
