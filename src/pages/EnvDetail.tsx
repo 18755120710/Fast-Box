@@ -15,6 +15,8 @@ export const EnvDetail: React.FC<{ packageName: string }> = ({ packageName }) =>
   const [loadingAction, setLoadingAction] = useState<string | null>(null);
   const [verifyResults, setVerifyResults] = useState<VerifyResult[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [confirmUninstallVersion, setConfirmUninstallVersion] = useState<string | null>(null);
 
   useEffect(() => {
     refreshState();
@@ -57,18 +59,21 @@ export const EnvDetail: React.FC<{ packageName: string }> = ({ packageName }) =>
     }
   };
 
-  const handleUninstallVersion = async (version: string) => {
-    if (!window.confirm(t('detail.confirmUninstall', { packageName, version }))) {
-      return;
-    }
+  const handleUninstallVersion = (version: string) => {
+    setConfirmUninstallVersion(version);
+  };
+
+  const executeUninstall = async (version: string) => {
+    setConfirmUninstallVersion(null);
     setLoadingAction(`uninstall-${version}`);
     setError(null);
+    setSuccessMessage(null);
     try {
       const msg = await invoke<string>('uninstall_package_version', { name: packageName, version });
       await refreshState();
       setVerifyResults(null);
       if (msg) {
-        alert(msg);
+        setSuccessMessage(msg);
       }
     } catch (err: any) {
       setError(t('detail.uninstallError', { error: String(err) }));
@@ -112,6 +117,18 @@ export const EnvDetail: React.FC<{ packageName: string }> = ({ packageName }) =>
           <button 
             onClick={() => setError(null)} 
             className="text-[10px] font-semibold underline hover:text-red-800 cursor-pointer"
+          >
+            {t('common.dismiss')}
+          </button>
+        </div>
+      )}
+
+      {successMessage && (
+        <div className="border border-emerald-100 bg-emerald-50/50 p-4 rounded-xl text-emerald-800 flex justify-between items-center animate-fade-in shadow-sm">
+          <span>{successMessage}</span>
+          <button 
+            onClick={() => setSuccessMessage(null)} 
+            className="text-[10px] font-semibold underline hover:text-emerald-950 cursor-pointer"
           >
             {t('common.dismiss')}
           </button>
@@ -248,6 +265,33 @@ export const EnvDetail: React.FC<{ packageName: string }> = ({ packageName }) =>
           })}
         </div>
       </div>
+      {confirmUninstallVersion && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 animate-fade-in animate-duration-150">
+          <div className="bg-white border border-slate-100 rounded-xl p-6 max-w-sm w-full mx-4 shadow-xl space-y-4 animate-scale-in">
+            <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+              <Trash2 className="h-4 w-4 text-red-500" />
+              {t('detail.uninstallTitle')}
+            </h3>
+            <p className="text-slate-500 text-[10px] leading-relaxed">
+              {t('detail.confirmUninstall', { packageName, version: confirmUninstallVersion })}
+            </p>
+            <div className="flex justify-end gap-2.5 pt-2">
+              <button
+                onClick={() => setConfirmUninstallVersion(null)}
+                className="px-3.5 py-1.5 border border-slate-200 hover:bg-slate-50 hover:border-slate-300 text-slate-700 rounded-lg font-bold text-[10px] cursor-pointer transition-all duration-150 shadow-sm"
+              >
+                {t('common.dismiss')}
+              </button>
+              <button
+                onClick={() => executeUninstall(confirmUninstallVersion)}
+                className="px-3.5 py-1.5 bg-red-600 hover:bg-red-500 text-white rounded-lg font-bold text-[10px] cursor-pointer shadow-sm transition-all duration-150"
+              >
+                {t('detail.uninstallTitle')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
