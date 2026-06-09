@@ -23,111 +23,119 @@ export const Settings: React.FC = () => {
   };
 
   return (
-    <div className="space-y-8 animate-fade-in font-mono text-xs">
+    <div className="space-y-6 animate-fade-in font-sans text-xs">
       <div>
-        <h2 className="text-xl font-bold text-slate-100 flex items-center gap-2">
-          {t('settings.title')} <SettingsIcon className="h-5 w-5 text-accent" />
+        <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+          {t('settings.title')} <SettingsIcon className="h-5 w-5 text-slate-700" />
         </h2>
-        <p className="text-[10px] text-slate-500 mt-0.5">{t('settings.description')}</p>
+        <p className="text-[10px] text-slate-400 mt-0.5">{t('settings.description')}</p>
       </div>
 
       {/* 语言设置 */}
-      <div className="border border-slate-800 bg-slate-950 p-5 rounded space-y-4">
-        <h3 className="font-bold text-slate-200 uppercase tracking-wider text-[10px] border-b border-slate-900 pb-2">
+      <div className="border border-slate-200/80 bg-white p-6 rounded-xl space-y-4 shadow-sm hover:shadow-md transition-all duration-200">
+        <h3 className="font-bold text-slate-800 uppercase tracking-wider text-[10px] border-b border-slate-100 pb-2.5">
           {t('settings.languageTitle')}
         </h3>
-        <div className="space-y-2">
-          <label className="text-slate-400 block">{t('settings.languageLabel')}</label>
-          <div className="inline-flex rounded border border-slate-800 bg-slate-900 p-1">
+        <div className="space-y-2.5">
+          <label className="text-slate-500 font-medium block">{t('settings.languageLabel')}</label>
+          <div className="inline-flex rounded-lg border border-slate-200 bg-slate-100 p-0.5 shadow-inner">
             <button
               onClick={() => setLanguage('en')}
-              className={`px-3 py-1.5 rounded text-[10px] font-bold transition-colors ${language === 'en' ? 'bg-accent text-slate-950' : 'text-slate-400 hover:text-slate-200'}`}
+              className={`px-3 py-1.5 rounded-md text-[10px] font-bold transition-all duration-150 cursor-pointer ${language === 'en' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
             >
               {t('settings.english')}
             </button>
             <button
               onClick={() => setLanguage('zh')}
-              className={`px-3 py-1.5 rounded text-[10px] font-bold transition-colors ${language === 'zh' ? 'bg-accent text-slate-950' : 'text-slate-400 hover:text-slate-200'}`}
+              className={`px-3 py-1.5 rounded-md text-[10px] font-bold transition-all duration-150 cursor-pointer ${language === 'zh' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
             >
               {t('settings.chinese')}
             </button>
           </div>
-          <p className="text-[10px] text-slate-500">{t('settings.languageDescription')}</p>
+          <p className="text-[10px] text-slate-400">{t('settings.languageDescription')}</p>
         </div>
       </div>
 
       {/* 工作目录配置 */}
-      <div className="border border-slate-800 bg-slate-950 p-5 rounded space-y-4">
-        <h3 className="font-bold text-slate-200 uppercase tracking-wider text-[10px] border-b border-slate-900 pb-2">
+      <div className="border border-slate-200/80 bg-white p-6 rounded-xl space-y-4 shadow-sm hover:shadow-md transition-all duration-200">
+        <h3 className="font-bold text-slate-800 uppercase tracking-wider text-[10px] border-b border-slate-100 pb-2.5">
           {t('settings.rootTitle')}
         </h3>
-        <div className="space-y-2">
-          <label className="text-slate-400 block">{t('settings.workspacePath')}</label>
+        <div className="space-y-2.5">
+          <label className="text-slate-500 font-medium block">{t('settings.workspacePath')}</label>
           <div className="flex gap-2">
             <input
               type="text"
               value={workspace}
               onChange={(e) => setWorkspace(e.target.value)}
-              className="flex-1 bg-slate-900 border border-slate-800 rounded px-3 py-2 text-slate-200 focus:outline-none focus:border-accent"
+              className="flex-1 bg-white border border-slate-200 rounded-lg px-3 py-2 text-slate-800 placeholder-slate-400 focus:outline-none focus:border-slate-800 focus:ring-1 focus:ring-slate-800 transition-all duration-150 shadow-sm text-xs font-mono"
             />
-            <button className="px-3 py-2 bg-slate-900 border border-slate-800 text-slate-400 hover:text-slate-200 hover:border-slate-700 rounded font-bold cursor-pointer">
+            <button className="px-3.5 py-2 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-300 rounded-lg font-bold text-xs cursor-pointer shadow-sm transition-colors duration-150">
               {t('settings.browse')}
             </button>
           </div>
-          <p className="text-[10px] text-slate-500">
+          <p className="text-[10px] text-slate-400">
             {t('settings.workspaceDescription')}
           </p>
         </div>
       </div>
 
       {/* 镜像偏好与 Registry 地址 */}
-      <div className="border border-slate-800 bg-slate-950 p-5 rounded space-y-4">
-        <h3 className="font-bold text-slate-200 uppercase tracking-wider text-[10px] border-b border-slate-900 pb-2">
+      <div className="border border-slate-200/80 bg-white p-6 rounded-xl space-y-4 shadow-sm hover:shadow-md transition-all duration-200">
+        <h3 className="font-bold text-slate-800 uppercase tracking-wider text-[10px] border-b border-slate-100 pb-2.5">
           {t('settings.registryTitle')}
         </h3>
-        <div className="space-y-3">
+        <div className="space-y-3.5">
           <div className="flex flex-col sm:flex-row gap-3">
             {/* 华为源 */}
-            <label className="flex-1 border border-slate-800 bg-slate-900/40 hover:bg-slate-900 hover:border-accent/40 rounded p-3 flex items-center justify-between cursor-pointer transition-colors duration-150">
+            <label className={`flex-1 border p-4 rounded-xl flex items-center justify-between cursor-pointer transition-all duration-150 shadow-sm ${
+              registryMode === 'huawei'
+                ? 'border-slate-800 bg-slate-50/50'
+                : 'border-slate-200/80 bg-white hover:border-slate-300 hover:bg-slate-50/30'
+            }`}>
               <div className="space-y-1">
-                <span className="font-bold text-slate-200">{t('settings.huawei')}</span>
-                <p className="text-[9px] text-slate-500">{t('settings.huaweiBody')}</p>
+                <span className="font-bold text-slate-800">{t('settings.huawei')}</span>
+                <p className="text-[9px] text-slate-400">{t('settings.huaweiBody')}</p>
               </div>
               <input
                 type="radio"
                 name="registry"
                 checked={registryMode === 'huawei'}
                 onChange={() => setRegistryMode('huawei')}
-                className="accent-accent"
+                className="accent-slate-900 h-4 w-4 cursor-pointer"
               />
             </label>
 
             {/* 官方源 */}
-            <label className="flex-1 border border-slate-800 bg-slate-900/40 hover:bg-slate-900 hover:border-accent/40 rounded p-3 flex items-center justify-between cursor-pointer transition-colors duration-150">
+            <label className={`flex-1 border p-4 rounded-xl flex items-center justify-between cursor-pointer transition-all duration-150 shadow-sm ${
+              registryMode === 'official'
+                ? 'border-slate-800 bg-slate-50/50'
+                : 'border-slate-200/80 bg-white hover:border-slate-300 hover:bg-slate-50/30'
+            }`}>
               <div className="space-y-1">
-                <span className="font-bold text-slate-200">{t('settings.official')}</span>
-                <p className="text-[9px] text-slate-500">{t('settings.officialBody')}</p>
+                <span className="font-bold text-slate-800">{t('settings.official')}</span>
+                <p className="text-[9px] text-slate-400">{t('settings.officialBody')}</p>
               </div>
               <input
                 type="radio"
                 name="registry"
                 checked={registryMode === 'official'}
                 onChange={() => setRegistryMode('official')}
-                className="accent-accent"
+                className="accent-slate-900 h-4 w-4 cursor-pointer"
               />
             </label>
           </div>
 
           {/* NPM Registry 配置 */}
           <div className="space-y-2 pt-2">
-            <label className="text-slate-400 block">{t('settings.npmRegistry')}</label>
+            <label className="text-slate-500 font-medium block">{t('settings.npmRegistry')}</label>
             <input
               type="text"
               value={customRegistry}
               onChange={(e) => setCustomRegistry(e.target.value)}
-              className="w-full bg-slate-900 border border-slate-800 rounded px-3 py-2 text-slate-200 focus:outline-none focus:border-accent"
+              className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-slate-800 placeholder-slate-400 focus:outline-none focus:border-slate-800 focus:ring-1 focus:ring-slate-800 transition-all duration-150 shadow-sm text-xs font-mono"
             />
-            <p className="text-[10px] text-slate-500">
+            <p className="text-[10px] text-slate-400">
               {t('settings.npmRegistryBody')}
             </p>
           </div>
@@ -135,35 +143,35 @@ export const Settings: React.FC = () => {
       </div>
 
       {/* PATH 环境变量引导提示 */}
-      <div className="border border-yellow-500/20 bg-yellow-500/5 p-5 rounded space-y-4">
-        <h3 className="font-bold text-yellow-500 uppercase tracking-wider text-[10px] flex items-center gap-2">
-          <AlertTriangle className="h-4 w-4" />
+      <div className="border border-amber-200 bg-amber-50/20 p-6 rounded-xl space-y-4 shadow-sm">
+        <h3 className="font-bold text-amber-700 uppercase tracking-wider text-[10px] flex items-center gap-2">
+          <AlertTriangle className="h-4.5 w-4.5 text-amber-500" />
           {t('settings.pathTitle')}
         </h3>
-        <p className="text-[10px] text-slate-300 leading-relaxed">
+        <p className="text-[10px] text-slate-600 leading-relaxed">
           {t('settings.pathBody')}
         </p>
 
         {/* 环境变量命令复制盒 */}
-        <div className="bg-slate-950 border border-slate-800 rounded p-3 flex items-center justify-between gap-4 font-mono text-[11px] text-slate-200">
-          <code className="text-accent select-all">{getPathExportCommand()}</code>
+        <div className="bg-[#090D16] border border-slate-200/20 rounded-lg p-3.5 flex items-center justify-between gap-4 font-mono text-[11px] text-slate-200 shadow-sm">
+          <code className="text-emerald-400 select-all font-mono">{getPathExportCommand()}</code>
           <button
             onClick={handleCopyPath}
-            className="flex-shrink-0 p-1.5 bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 text-slate-300 rounded cursor-pointer transition-colors duration-150"
+            className="flex-shrink-0 p-2 bg-white/10 hover:bg-white/20 border border-white/10 hover:border-white/20 text-white rounded-lg cursor-pointer transition-all duration-150 shadow-sm"
             title={t('settings.copyCommandTitle')}
           >
-            {copied ? <Check className="h-3.5 w-3.5 text-accent" /> : <Copy className="h-3.5 w-3.5" />}
+            {copied ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}
           </button>
         </div>
 
         {/* 引导步骤 */}
-        <div className="space-y-2 text-[10px] text-slate-400 pt-1">
-          <div className="font-semibold text-slate-300">{t('settings.howToApply')}</div>
-          <ol className="list-decimal list-inside space-y-1">
+        <div className="space-y-2 text-[10px] text-slate-500 pt-1">
+          <div className="font-semibold text-slate-700">{t('settings.howToApply')}</div>
+          <ol className="list-decimal list-inside space-y-1.5">
             <li>{t('settings.step1')}</li>
-            <li>{t('settings.step2')} <code className="text-slate-300 bg-slate-900 px-1 py-0.5 rounded">~/.zshrc</code> / <code className="text-slate-300 bg-slate-900 px-1 py-0.5 rounded">~/.bash_profile</code>.</li>
+            <li>{t('settings.step2')} <code className="text-slate-700 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200/50 font-mono">~/.zshrc</code> / <code className="text-slate-700 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200/50 font-mono">~/.bash_profile</code>.</li>
             <li>{t('settings.step3')}</li>
-            <li>{t('settings.step4')} <code className="text-slate-300 bg-slate-900 px-1.5 py-0.5 rounded">source ~/.zshrc</code>.</li>
+            <li>{t('settings.step4')} <code className="text-slate-700 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200/50 font-mono">source ~/.zshrc</code>.</li>
           </ol>
         </div>
       </div>

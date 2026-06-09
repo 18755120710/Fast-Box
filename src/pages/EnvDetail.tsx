@@ -84,27 +84,27 @@ export const EnvDetail: React.FC<{ packageName: string }> = ({ packageName }) =>
   };
 
   return (
-    <div className="space-y-6 animate-fade-in font-mono text-xs">
+    <div className="space-y-6 animate-fade-in font-sans text-xs">
       {/* 头部导航与返回 */}
       <div className="flex items-center gap-4">
         <button
           onClick={() => setCurrentTab('env')}
-          className="p-1.5 border border-slate-800 bg-slate-950 rounded hover:border-accent hover:text-accent transition-colors duration-150 cursor-pointer"
+          className="p-2 bg-white border border-slate-200 text-slate-600 rounded-lg hover:border-slate-300 hover:text-slate-900 transition-all duration-150 cursor-pointer shadow-sm"
         >
           <ArrowLeft className="h-4 w-4" />
         </button>
         <div>
-          <h2 className="text-xl font-bold text-slate-100">{t('detail.title', { name: pkg.displayName })}</h2>
-          <p className="text-[10px] text-slate-500 mt-0.5">{t('detail.description')}</p>
+          <h2 className="text-xl font-bold text-slate-900">{t('detail.title', { name: pkg.displayName })}</h2>
+          <p className="text-[10px] text-slate-400 mt-0.5">{t('detail.description')}</p>
         </div>
       </div>
 
       {error && (
-        <div className="border border-red-500/30 bg-red-500/10 p-3 rounded text-red-500 flex justify-between items-center animate-fade-in">
+        <div className="border border-red-100 bg-red-50/50 p-4 rounded-xl text-red-600 flex justify-between items-center animate-fade-in shadow-sm">
           <span>{error}</span>
           <button 
             onClick={() => setError(null)} 
-            className="text-[10px] underline hover:text-red-400 cursor-pointer"
+            className="text-[10px] font-semibold underline hover:text-red-800 cursor-pointer"
           >
             {t('common.dismiss')}
           </button>
@@ -113,27 +113,27 @@ export const EnvDetail: React.FC<{ packageName: string }> = ({ packageName }) =>
 
       {/* 校验报告展示区 */}
       {verifyResults && (
-        <div className="border border-slate-800 bg-slate-950 p-4 rounded space-y-3">
+        <div className="border border-slate-200/80 bg-white p-5 rounded-xl space-y-3 shadow-sm">
           <div className="flex justify-between items-center">
-            <h3 className="font-bold text-slate-200 flex items-center gap-2">
-              <ShieldCheck className="h-4 w-4 text-accent" />
+            <h3 className="font-bold text-slate-800 flex items-center gap-2">
+              <ShieldCheck className="h-4 w-4 text-emerald-500" />
               {t('detail.reportTitle')}
             </h3>
             <button
               onClick={() => setVerifyResults(null)}
-              className="text-[10px] text-slate-500 hover:text-slate-300 underline cursor-pointer"
+              className="text-[10px] text-slate-400 hover:text-slate-600 underline cursor-pointer"
             >
               {t('common.dismiss')}
             </button>
           </div>
           <div className="space-y-2">
             {verifyResults.map((v, i) => (
-              <div key={i} className="bg-slate-900 p-2.5 rounded border border-slate-800 flex justify-between items-start">
+              <div key={i} className="bg-slate-50/50 p-3 rounded-lg border border-slate-100 flex justify-between items-start">
                 <div className="space-y-1">
-                  <div className="font-bold text-slate-300">{`$ ${v.command}`}</div>
-                  <div className="text-[10px] text-slate-500 whitespace-pre-wrap">{v.output || v.error}</div>
+                  <div className="font-bold text-slate-700 font-mono">{`$ ${v.command}`}</div>
+                  <div className="text-[10px] text-slate-400 font-mono whitespace-pre-wrap">{v.output || v.error}</div>
                 </div>
-                <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${v.success ? 'bg-accent/10 border border-accent/20 text-accent' : 'bg-red-500/10 border border-red-500/20 text-red-500'}`}>
+                <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${v.success ? 'bg-emerald-50 border border-emerald-200 text-emerald-700' : 'bg-red-50 border border-red-200 text-red-700'}`}>
                   {v.success ? t('common.pass') : t('common.fail')}
                 </span>
               </div>
@@ -143,33 +143,33 @@ export const EnvDetail: React.FC<{ packageName: string }> = ({ packageName }) =>
       )}
 
       {/* 版本列表卡片 */}
-      <div className="border border-slate-800 bg-slate-950 rounded overflow-hidden">
-        <div className="bg-slate-900 border-b border-slate-800 px-5 py-3 text-slate-300 font-bold">
+      <div className="border border-slate-200/80 bg-white rounded-xl overflow-hidden shadow-sm">
+        <div className="bg-slate-50/60 border-b border-slate-100 px-6 py-4 text-slate-800 font-bold">
           {t('detail.versionListTitle')}
         </div>
-        <div className="divide-y divide-slate-900">
+        <div className="divide-y divide-slate-100">
           {candidateVersions.map((cand) => {
             const isInstalled = pkg.installedVersions.includes(cand.version);
             const isActive = pkg.activeVersion === cand.version;
             const isLoading = loadingAction?.includes(cand.version);
 
             return (
-              <div key={cand.version} className="p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div key={cand.version} className="px-6 py-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
                 {/* 左侧元信息 */}
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
-                    <span className="text-sm font-bold text-slate-200">
+                    <span className="text-sm font-bold text-slate-800">
                       {cand.version === 'system' ? 'System (系统)' : cand.version}
                     </span>
-                    <span className="bg-slate-800 text-slate-400 px-2 py-0.5 rounded text-[9px] uppercase tracking-wider font-bold">
+                    <span className="bg-slate-100 text-slate-600 px-2 py-0.5 rounded text-[9px] uppercase tracking-wider font-bold">
                       {cand.type}
                     </span>
-                    <span className="text-slate-500 text-[10px]">({cand.codename})</span>
+                    <span className="text-slate-400 text-[10px]">({cand.codename})</span>
                   </div>
-                  <div className="text-[10px] text-slate-500 font-mono">
+                  <div className="text-[10px] text-slate-400 font-sans">
                     {isActive ? (
-                      <span className="text-accent flex items-center gap-1.5">
-                        <CheckCircle2 className="h-3.5 w-3.5" /> {t('detail.shimActivated')}
+                      <span className="text-emerald-600 flex items-center gap-1.5 font-medium">
+                        <CheckCircle2 className="h-4 w-4 text-emerald-500" /> {t('detail.shimActivated')}
                       </span>
                     ) : isInstalled ? (
                       t('detail.installedInactive')
@@ -180,19 +180,19 @@ export const EnvDetail: React.FC<{ packageName: string }> = ({ packageName }) =>
                 </div>
 
                 {/* 右侧动作控制 */}
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2.5">
                   {isInstalled ? (
                     <>
                       {/* 激活设置 */}
                       <button
                         disabled={isActive || !!isLoading}
                         onClick={() => handleUseVersion(cand.version)}
-                        className={`px-3 py-1.5 rounded font-bold transition-colors duration-150 ${
+                        className={`px-3.5 py-1.5 rounded-lg font-bold text-xs transition-all duration-150 ${
                           isActive || !!isLoading ? 'cursor-not-allowed' : 'cursor-pointer'
                         } ${
                           isActive
-                            ? 'bg-slate-800 text-slate-500 border border-slate-700'
-                            : 'bg-accent hover:bg-accent-hover text-slate-950'
+                            ? 'bg-slate-50 text-slate-400 border border-slate-200/60'
+                            : 'bg-slate-900 hover:bg-slate-800 text-white shadow-sm'
                         }`}
                       >
                         {isLoading && loadingAction?.startsWith('use') ? t('detail.activating') : t('detail.activate')}
@@ -202,7 +202,7 @@ export const EnvDetail: React.FC<{ packageName: string }> = ({ packageName }) =>
                       <button
                         disabled={!!isLoading}
                         onClick={() => handleVerify(cand.version)}
-                        className={`px-3 py-1.5 bg-slate-900 border border-slate-800 text-slate-300 hover:border-slate-700 rounded font-bold transition-colors duration-150 ${
+                        className={`px-3.5 py-1.5 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-300 rounded-lg font-bold text-xs transition-all duration-150 shadow-sm ${
                           isLoading ? 'cursor-not-allowed' : 'cursor-pointer'
                         }`}
                       >
@@ -214,7 +214,7 @@ export const EnvDetail: React.FC<{ packageName: string }> = ({ packageName }) =>
                         <button
                           disabled={!!isLoading}
                           onClick={() => handleUninstallVersion(cand.version)}
-                          className={`p-2 bg-slate-900 border border-slate-800 text-slate-400 hover:text-red-500 hover:border-red-500/30 rounded transition-colors duration-150 ${
+                          className={`p-2 bg-white border border-slate-200 text-slate-400 hover:text-red-500 hover:border-red-200 hover:bg-red-50/50 rounded-lg transition-all duration-150 shadow-sm ${
                             isLoading ? 'cursor-not-allowed' : 'cursor-pointer'
                           }`}
                           title={t('detail.uninstallTitle')}
@@ -228,7 +228,7 @@ export const EnvDetail: React.FC<{ packageName: string }> = ({ packageName }) =>
                     <button
                       disabled={!!isLoading}
                       onClick={() => startInstall(packageName, cand.version)}
-                      className={`px-3 py-1.5 bg-slate-900 border border-slate-800 text-accent hover:border-accent/40 rounded font-bold transition-all duration-150 ${
+                      className={`px-3.5 py-1.5 bg-white border border-slate-200 text-slate-700 hover:border-slate-300 hover:bg-slate-50 rounded-lg font-bold text-xs transition-all duration-150 shadow-sm ${
                         isLoading ? 'cursor-not-allowed' : 'cursor-pointer'
                       }`}
                     >

@@ -9,13 +9,16 @@ export const Home: React.FC = () => {
   const activeVersion = activeNode?.activeVersion;
 
   return (
-    <div className="space-y-8 animate-fade-in font-mono">
+    <div className="space-y-6 animate-fade-in font-sans">
       {/* 欢迎语与系统简介 */}
       <div>
-        <h2 className="text-xl font-bold text-slate-100 flex items-center gap-2">
-          {t('home.title')} <span className="text-[10px] text-accent font-normal bg-accent/10 px-2 py-0.5 rounded border border-accent/20">{t('home.badge')}</span>
+        <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+          {t('home.title')}{' '}
+          <span className="text-[9px] text-emerald-700 font-semibold bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-100/80">
+            {t('home.badge')}
+          </span>
         </h2>
-        <p className="text-xs text-slate-400 mt-1">
+        <p className="text-xs text-slate-500 mt-1">
           {t('home.description')}
         </p>
       </div>
@@ -23,21 +26,21 @@ export const Home: React.FC = () => {
       {/* 核心卡片网格 */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* 系统基础信息 */}
-        <div className="border border-slate-800 bg-slate-955 bg-slate-950 p-5 rounded relative overflow-hidden">
-          <div className="absolute top-0 right-0 h-16 w-16 bg-gradient-to-br from-accent/5 to-transparent pointer-events-none" />
-          <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">{t('home.hostSystem')}</h3>
-          <div className="space-y-2 text-xs">
-            <div className="flex justify-between py-1 border-b border-slate-900/60">
+        <div className="border border-slate-200/80 bg-white p-6 rounded-xl relative overflow-hidden shadow-sm hover:shadow-md transition-all duration-200">
+          <div className="absolute top-0 right-0 h-16 w-16 bg-gradient-to-br from-emerald-500/5 to-transparent pointer-events-none" />
+          <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-4">{t('home.hostSystem')}</h3>
+          <div className="space-y-2.5 text-xs">
+            <div className="flex justify-between py-1 border-b border-slate-100">
               <span className="text-slate-500">{t('home.os')}</span>
-              <span className="text-slate-200 capitalize">{systemInfo?.os || t('common.detecting')}</span>
+              <span className="text-slate-800 font-medium capitalize">{systemInfo?.os || t('common.detecting')}</span>
             </div>
-            <div className="flex justify-between py-1 border-b border-slate-900/60">
+            <div className="flex justify-between py-1 border-b border-slate-100">
               <span className="text-slate-500">{t('home.architecture')}</span>
-              <span className="text-slate-200">{systemInfo?.arch || t('common.detecting')}</span>
+              <span className="text-slate-800 font-medium">{systemInfo?.arch || t('common.detecting')}</span>
             </div>
             <div className="flex justify-between py-1">
               <span className="text-slate-500">{t('home.binaryProxy')}</span>
-              <span className="text-accent underline cursor-pointer text-[10px] max-w-[180px] truncate" title={systemInfo?.fastboxHome ? systemInfo.fastboxHome + '/shims' : t('common.detecting')}>
+              <span className="text-emerald-600 hover:text-emerald-700 underline cursor-pointer text-[10px] font-mono max-w-[180px] truncate" title={systemInfo?.fastboxHome ? systemInfo.fastboxHome + '/shims' : t('common.detecting')}>
                 {systemInfo?.fastboxHome ? `${systemInfo.fastboxHome}/shims` : t('common.detecting')}
               </span>
             </div>
@@ -45,74 +48,74 @@ export const Home: React.FC = () => {
         </div>
 
         {/* 激活的环境信息 */}
-        <div className="border border-slate-800 bg-slate-950 p-5 rounded relative overflow-hidden">
-          <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">{t('home.activeToolchain')}</h3>
-          <div className="space-y-2 text-xs">
-            <div className="flex justify-between py-1 border-b border-slate-900/60">
+        <div className="border border-slate-200/80 bg-white p-6 rounded-xl relative overflow-hidden shadow-sm hover:shadow-md transition-all duration-200">
+          <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-4">{t('home.activeToolchain')}</h3>
+          <div className="space-y-2.5 text-xs">
+            <div className="flex justify-between py-1 border-b border-slate-100">
               <span className="text-slate-500">{t('home.runtimeEnv')}</span>
-              <span className="text-slate-200 font-semibold">{activeNode?.displayName || 'Node.js'}</span>
+              <span className="text-slate-800 font-semibold">{activeNode?.displayName || 'Node.js'}</span>
             </div>
-            <div className="flex justify-between py-1 border-b border-slate-900/60">
+            <div className="flex justify-between py-1 border-b border-slate-100">
               <span className="text-slate-500">{t('home.activeVersion')}</span>
-              <span className={activeVersion ? 'text-accent font-bold' : 'text-slate-500'}>
+              <span className={activeVersion ? 'text-emerald-600 font-bold font-mono' : 'text-slate-400 font-medium'}>
                 {activeVersion || t('home.noneInactive')}
               </span>
             </div>
             <div className="flex justify-between py-1">
               <span className="text-slate-500">{t('home.totalInstalled')}</span>
-              <span className="text-slate-200">{t('home.versions', { count: activeNode?.installedVersions.length || 0 })}</span>
+              <span className="text-slate-800 font-medium">{t('home.versions', { count: activeNode?.installedVersions.length || 0 })}</span>
             </div>
           </div>
         </div>
       </div>
 
       {/* 最近活动与错误日志区域 */}
-      <div className="border border-slate-800 bg-slate-950 rounded overflow-hidden">
-        <div className="px-5 py-4 bg-slate-900 border-b border-slate-800 flex justify-between items-center">
-          <div className="flex items-center gap-2 text-xs font-bold text-slate-300">
-            <Shield className="h-4 w-4 text-accent" />
+      <div className="border border-slate-200/80 bg-white rounded-xl overflow-hidden shadow-sm">
+        <div className="px-6 py-4 bg-slate-50/60 border-b border-slate-100 flex justify-between items-center">
+          <div className="flex items-center gap-2 text-xs font-bold text-slate-800">
+            <Shield className="h-4 w-4 text-emerald-500" />
             <span>{t('home.activities')}</span>
           </div>
           <button
             onClick={refreshState}
-            className="p-1 hover:bg-slate-800 rounded text-slate-400 hover:text-slate-200 transition-colors cursor-pointer"
+            className="p-1 hover:bg-slate-200/80 rounded-lg text-slate-500 hover:text-slate-800 transition-colors cursor-pointer border border-transparent"
           >
             <RefreshCw className="h-3.5 w-3.5" />
           </button>
         </div>
-        <div className="p-5 text-xs space-y-3">
+        <div className="p-6 text-xs space-y-4">
           {/* 最近历史 */}
-          <div className="flex items-start gap-3 text-slate-300">
-            <CheckCircle className="h-4 w-4 text-accent mt-0.5 flex-shrink-0" />
+          <div className="flex items-start gap-3 text-slate-700">
+            <CheckCircle className="h-4.5 w-4.5 text-emerald-500 mt-0.5 flex-shrink-0" />
             <div className="flex-1">
               <div className="flex justify-between">
-                <span className="font-semibold">{t('home.shimGenerated')}</span>
-                <span className="text-[10px] text-slate-500">{t('home.justNow')}</span>
+                <span className="font-semibold text-slate-800">{t('home.shimGenerated')}</span>
+                <span className="text-[10px] text-slate-400">{t('home.justNow')}</span>
               </div>
               <p className="text-[10px] text-slate-500 mt-0.5">{t('home.shimGeneratedBody')}</p>
             </div>
           </div>
 
-          <div className="flex items-start gap-3 text-slate-300">
-            <CheckCircle className="h-4 w-4 text-accent mt-0.5 flex-shrink-0" />
+          <div className="flex items-start gap-3 text-slate-700">
+            <CheckCircle className="h-4.5 w-4.5 text-emerald-500 mt-0.5 flex-shrink-0" />
             <div className="flex-1">
               <div className="flex justify-between">
-                <span className="font-semibold">{t('home.cacheUpdated')}</span>
-                <span className="text-[10px] text-slate-500">{t('home.twoHoursAgo')}</span>
+                <span className="font-semibold text-slate-800">{t('home.cacheUpdated')}</span>
+                <span className="text-[10px] text-slate-400">{t('home.twoHoursAgo')}</span>
               </div>
               <p className="text-[10px] text-slate-500 mt-0.5">{t('home.cacheUpdatedBody')}</p>
             </div>
           </div>
 
           {/* 异常警示展示 */}
-          <div className="flex items-start gap-3 border-t border-slate-900 pt-3 text-slate-300">
-            <AlertCircle className="h-4 w-4 text-yellow-500 mt-0.5 flex-shrink-0" />
+          <div className="flex items-start gap-3 border-t border-slate-100 pt-4 text-slate-700">
+            <AlertCircle className="h-4.5 w-4.5 text-amber-500 mt-0.5 flex-shrink-0" />
             <div className="flex-1">
               <div className="flex justify-between">
-                <span className="font-semibold text-yellow-500">{t('home.pathMissing')}</span>
-                <span className="text-[10px] text-slate-500">{t('home.warning')}</span>
+                <span className="font-semibold text-amber-600">{t('home.pathMissing')}</span>
+                <span className="text-[10px] text-slate-400 font-medium">{t('home.warning')}</span>
               </div>
-              <p className="text-[10px] text-slate-400 mt-0.5">
+              <p className="text-[10px] text-slate-500 mt-0.5 leading-relaxed">
                 {t('home.pathMissingBody')}
               </p>
             </div>
