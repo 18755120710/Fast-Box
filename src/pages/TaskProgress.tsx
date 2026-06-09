@@ -5,7 +5,7 @@ import { LogPanel } from '../components/LogPanel';
 import { CheckCircle2, AlertOctagon, Terminal } from 'lucide-react';
 
 export const TaskProgress: React.FC = () => {
-  const { activeTask, clearActiveTask, t } = useApp();
+  const { activeTask, clearActiveTask, refreshState, t } = useApp();
 
   const isIdle = activeTask.status === 'idle';
 
@@ -64,7 +64,10 @@ export const TaskProgress: React.FC = () => {
             {(activeTask.status === 'success' || activeTask.status === 'failed') && (
               <div className="flex justify-end pt-2">
                 <button
-                  onClick={clearActiveTask}
+                  onClick={async () => {
+                    clearActiveTask();
+                    await refreshState();
+                  }}
                   className="px-3.5 py-1.5 bg-white border border-slate-200 hover:bg-slate-50 hover:border-slate-300 text-slate-700 rounded-lg font-bold text-xs cursor-pointer shadow-sm transition-all duration-150"
                 >
                   {t('task.clear')}

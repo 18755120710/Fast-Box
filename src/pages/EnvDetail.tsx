@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { invoke } from '@tauri-apps/api/core';
 import { ArrowLeft, CheckCircle2, Trash2, ShieldCheck } from 'lucide-react';
@@ -15,6 +15,10 @@ export const EnvDetail: React.FC<{ packageName: string }> = ({ packageName }) =>
   const [loadingAction, setLoadingAction] = useState<string | null>(null);
   const [verifyResults, setVerifyResults] = useState<VerifyResult[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    refreshState();
+  }, []);
 
   const pkg = packages.find((p) => p.name === packageName) || {
     name: packageName,
