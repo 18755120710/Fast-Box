@@ -76,7 +76,22 @@ pub fn run_cli(args: &[String]) -> Result<i32, String> {
 pub fn run_shim(bin_name: &str, passthrough_args: &[String]) -> Result<i32, String> {
     initialize_workspace()?;
 
-    let recipe = load_package_for_cli("node")?;
+    // 动态扫描所有软件包配方，查找定义了该 binary 的包
+    let package_names = crate::registry::list_all_package_names_for_cli()?;
+    let mut matching_recipe = None;
+
+    for pkg_name in package_names {
+        if let Ok(recipe) = load_package_for_cli(&pkg_name) {
+            if recipe.bins.iter().any(|b| b.name == bin_name) {
+                matching_recipe = Some(recipe);
+                break;
+            }
+        }
+    }
+
+    let recipe = matching_recipe
+        .ok_or_else(|| format!("Fast Box: no package config found defining binary '{}'", bin_name))?;
+
     let bin_path = resolve_active_binary(&recipe, bin_name)?;
     let status = Command::new(bin_path)
         .args(passthrough_args)
@@ -88,6 +103,7 @@ pub fn run_shim(bin_name: &str, passthrough_args: &[String]) -> Result<i32, Stri
 
     Ok(status.code().unwrap_or(1))
 }
+
 
 fn list_packages_cli() -> Result<Vec<PackageStatus>, String> {
     let package_names = crate::registry::list_all_package_names_for_cli()?;
