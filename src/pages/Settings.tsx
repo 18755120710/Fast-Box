@@ -4,7 +4,7 @@ import { Settings as SettingsIcon, Check, Copy, AlertTriangle } from 'lucide-rea
 import { invoke } from '@tauri-apps/api/core';
 
 export const Settings: React.FC = () => {
-  const { systemInfo, language, setLanguage, t, refreshState } = useApp();
+  const { systemInfo, setLanguage, t, refreshState } = useApp();
   const [workspace, setWorkspace] = useState('~/.fastbox');
   const [registryMode, setRegistryMode] = useState('huawei'); // 'official' | 'huawei' | 'custom'
   const [customRegistry, setCustomRegistry] = useState('https://registry.npmmirror.com');

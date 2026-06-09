@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
-import { Shield, RefreshCw, AlertCircle, CheckCircle, Clock } from 'lucide-react';
+import { Shield, RefreshCw, AlertCircle, CheckCircle } from 'lucide-react';
 import { invoke } from '@tauri-apps/api/core';
 
 interface ActivityItem {
