@@ -55,13 +55,47 @@ export default function MirrorManager() {
     }
   }
 
+  const getPostInstallMeta = (pkgName: string) => {
+    switch (pkgName) {
+      case 'node':
+        return {
+          key: 'npmRegistry',
+          label: 'npm 代理源 (npmRegistry)',
+          description: '软件安装后，为 npm 包管理器配置的默认国内镜像',
+          placeholder: '例如: https://registry.npmmirror.com'
+        }
+      case 'golang':
+        return {
+          key: 'goProxy',
+          label: 'Go Proxy 代理源 (goProxy)',
+          description: '软件安装后，为 Go 编译器配置的默认 GOPROXY 代理地址',
+          placeholder: '例如: https://goproxy.cn,direct'
+        }
+      case 'python':
+        return {
+          key: 'pipIndexUrl',
+          label: 'pip 镜像源 (pipIndexUrl)',
+          description: '软件安装后，为 pip 包管理器配置的默认 PyPI 镜像源地址',
+          placeholder: '例如: https://pypi.tuna.tsinghua.edu.cn/simple'
+        }
+      default:
+        return {
+          key: 'npmRegistry',
+          label: '后置代理源 (npmRegistry)',
+          description: '软件安装后配置的代理地址',
+          placeholder: '例如: https://registry.npmmirror.com'
+        }
+    }
+  }
+
   const handlePostInstallRegistryChange = (pkgName: string, value: string) => {
+    const meta = getPostInstallMeta(pkgName)
     setRecipes((prev) => {
       const next = { ...prev }
       if (!next[pkgName].postInstall) {
         next[pkgName].postInstall = {}
       }
-      next[pkgName].postInstall.npmRegistry = value
+      next[pkgName].postInstall[meta.key] = value
       return next
     })
     setDirty(true)
@@ -112,6 +146,18 @@ export default function MirrorManager() {
             recipe.postInstall.npmRegistry = 'https://registry.npmmirror.com'
             changed = true
           }
+        } else if (pkgName === 'golang') {
+          if (!recipe.postInstall) recipe.postInstall = {}
+          if (recipe.postInstall.goProxy !== 'https://goproxy.cn,direct') {
+            recipe.postInstall.goProxy = 'https://goproxy.cn,direct'
+            changed = true
+          }
+        } else if (pkgName === 'python') {
+          if (!recipe.postInstall) recipe.postInstall = {}
+          if (recipe.postInstall.pipIndexUrl !== 'https://pypi.tuna.tsinghua.edu.cn/simple') {
+            recipe.postInstall.pipIndexUrl = 'https://pypi.tuna.tsinghua.edu.cn/simple'
+            changed = true
+          }
         }
 
         for (const vNum of Object.keys(recipe.versions || {})) {
@@ -125,6 +171,19 @@ export default function MirrorManager() {
                 platform.mirrorUrls = [huaweiUrl, ...platform.mirrorUrls.filter((u: string) => u !== huaweiUrl)]
                 changed = true
               }
+            } else if (pkgName === 'golang' && platform.officialUrl.includes('go.dev')) {
+              const aliyunUrl = platform.officialUrl.replace('go.dev/dl/', 'mirrors.aliyun.com/golang/')
+              const ustcUrl = platform.officialUrl.replace('go.dev/dl/', 'mirrors.ustc.edu.cn/golang/')
+              if (!platform.mirrorUrls.includes(aliyunUrl)) {
+                platform.mirrorUrls = [aliyunUrl, ustcUrl, ...platform.mirrorUrls.filter((u: string) => u !== aliyunUrl && u !== ustcUrl)]
+                changed = true
+              }
+            } else if (pkgName === 'python' && platform.officialUrl.includes('python.org')) {
+              const huaweiUrl = platform.officialUrl.replace('www.python.org/ftp/python/', 'mirrors.huaweicloud.com/python/')
+              if (!platform.mirrorUrls.includes(huaweiUrl)) {
+                platform.mirrorUrls = [huaweiUrl, ...platform.mirrorUrls.filter((u: string) => u !== huaweiUrl)]
+                changed = true
+              }
             }
           }
         }
@@ -132,7 +191,7 @@ export default function MirrorManager() {
 
       if (changed) {
         setDirty(true)
-        alert('已成功自动填充国内加速镜像源与 npm 淘宝镜像！记得点击右上角“保存镜像配置”以写入文件。')
+        alert('已成功自动填充国内加速镜像源与后置代理配置！记得点击右上角“保存镜像配置”以写入文件。')
       } else {
         alert('当前已配置最优国内加速镜像，无需重复填充。')
       }
@@ -189,7 +248,8 @@ export default function MirrorManager() {
       <div className="space-y-8">
         {Object.keys(recipes).map((pkgName) => {
           const recipe = recipes[pkgName]
-          const npmRegistryVal = recipe.postInstall?.npmRegistry || ''
+          const meta = getPostInstallMeta(pkgName)
+          const registryVal = recipe.postInstall?.[meta.key] || ''
 
           return (
             <div key={pkgName} className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-6">
@@ -207,14 +267,14 @@ export default function MirrorManager() {
               {/* Registry Override */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-center bg-slate-50/50 p-4 rounded-xl border border-slate-100">
                 <div>
-                  <h4 className="text-xs font-bold text-slate-800">后置包管理器代理源 (npmRegistry)</h4>
-                  <p className="text-[10px] text-slate-500 mt-0.5">软件安装后，为 npm 等包管理器配置的默认国内镜像</p>
+                  <h4 className="text-xs font-bold text-slate-800">{meta.label}</h4>
+                  <p className="text-[10px] text-slate-500 mt-0.5">{meta.description}</p>
                 </div>
                 <div>
                   <input
                     type="text"
-                    placeholder="例如: https://registry.npmmirror.com"
-                    value={npmRegistryVal}
+                    placeholder={meta.placeholder}
+                    value={registryVal}
                     onChange={(e) => handlePostInstallRegistryChange(pkgName, e.target.value)}
                     className="w-full bg-white border border-slate-200 focus:border-slate-800 text-slate-950 px-3 py-1.5 rounded-lg text-xs transition-all focus:outline-none font-mono"
                   />

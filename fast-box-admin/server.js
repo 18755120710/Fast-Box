@@ -3,12 +3,14 @@ import cors from 'cors';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import Ajv from 'ajv';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = 3001;
+const ajv = new Ajv({ allErrors: true });
 
 app.use(cors());
 app.use(express.json());
@@ -156,9 +158,29 @@ app.put('/api/packages/:name', (req, res) => {
 
   try {
     const updatedData = req.body;
-    // Basic validation
-    if (!updatedData.name || !updatedData.displayName || !updatedData.versions || !updatedData.bins) {
-      return res.status(400).json({ error: 'Missing required package fields (name, displayName, versions, bins)' });
+
+    // Load schema
+    if (!fs.existsSync(SCHEMA_FILE)) {
+      return res.status(500).json({ error: 'Schema file package.schema.json not found' });
+    }
+    const schemaContent = fs.readFileSync(SCHEMA_FILE, 'utf-8');
+    const schema = JSON.parse(schemaContent);
+
+    // Validate using Ajv
+    const validate = ajv.compile(schema);
+    const valid = validate(updatedData);
+
+    if (!valid) {
+      const errorMsg = validate.errors.map(err => {
+        const pathPart = err.instancePath ? `Field "${err.instancePath}"` : 'JSON';
+        return `${pathPart} ${err.message}`;
+      }).join(', ');
+      return res.status(400).json({ error: `Schema validation failed: ${errorMsg}` });
+    }
+
+    // Double check name consistency
+    if (updatedData.name !== name) {
+      return res.status(400).json({ error: 'Cannot change package name. Package name inside JSON must match filename.' });
     }
 
     fs.writeFileSync(filePath, JSON.stringify(updatedData, null, 2), 'utf-8');
