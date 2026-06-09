@@ -120,6 +120,10 @@ const translations = {
     'settings.step2': 'Open your shell config file, for example',
     'settings.step3': 'Paste the line at the very bottom and save.',
     'settings.step4': 'Restart your terminal or run',
+    'settings.save': 'Save Settings',
+    'settings.saving': 'Saving...',
+    'settings.saveSuccess': 'Settings saved successfully!',
+    'settings.saveFailed': 'Failed to save settings: {error}',
   },
   zh: {
     'nav.dashboard': '仪表盘',
@@ -238,6 +242,10 @@ const translations = {
     'settings.step2': '打开你的 shell 配置文件，例如',
     'settings.step3': '把这行粘贴到文件底部并保存。',
     'settings.step4': '重启终端，或运行',
+    'settings.save': '保存设置',
+    'settings.saving': '正在保存...',
+    'settings.saveSuccess': '设置保存成功！',
+    'settings.saveFailed': '设置保存失败：{error}',
   },
 } as const;
 

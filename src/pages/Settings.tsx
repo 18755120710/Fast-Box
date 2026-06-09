@@ -1,13 +1,63 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { Settings as SettingsIcon, Check, Copy, AlertTriangle } from 'lucide-react';
+import { invoke } from '@tauri-apps/api/core';
 
 export const Settings: React.FC = () => {
-  const { systemInfo, language, setLanguage, t } = useApp();
+  const { systemInfo, language, setLanguage, t, refreshState } = useApp();
   const [workspace, setWorkspace] = useState('~/.fastbox');
   const [registryMode, setRegistryMode] = useState('huawei'); // 'official' | 'huawei' | 'custom'
   const [customRegistry, setCustomRegistry] = useState('https://registry.npmmirror.com');
+  const [localLanguage, setLocalLanguage] = useState<'en' | 'zh'>('zh');
   const [copied, setCopied] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<'success' | 'error' | null>(null);
+  const [errorMessage, setErrorMessage] = useState('');
+
+  useEffect(() => {
+    const loadSettings = async () => {
+      try {
+        const settings = await invoke<{
+          workspacePath: string;
+          registryMode: string;
+          customRegistry: string;
+          language: string;
+        }>('get_settings');
+        setWorkspace(settings.workspacePath);
+        setRegistryMode(settings.registryMode);
+        setCustomRegistry(settings.customRegistry);
+        setLocalLanguage(settings.language as 'en' | 'zh');
+      } catch (err) {
+        console.error('Failed to load settings:', err);
+      }
+    };
+    loadSettings();
+  }, []);
+
+  const handleSave = async () => {
+    setSaving(true);
+    setSaveStatus(null);
+    try {
+      await invoke('save_settings', {
+        settings: {
+          workspacePath: workspace,
+          registryMode,
+          customRegistry,
+          language: localLanguage,
+        }
+      });
+      setLanguage(localLanguage);
+      await refreshState();
+      setSaveStatus('success');
+      setTimeout(() => setSaveStatus(null), 3000);
+    } catch (err: any) {
+      console.error(err);
+      setSaveStatus('error');
+      setErrorMessage(err.toString());
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const getPathExportCommand = () => {
     const shimsDir = systemInfo?.fastboxHome 
@@ -40,14 +90,14 @@ export const Settings: React.FC = () => {
           <label className="text-slate-500 font-medium block">{t('settings.languageLabel')}</label>
           <div className="inline-flex rounded-lg border border-slate-200 bg-slate-100 p-0.5 shadow-inner">
             <button
-              onClick={() => setLanguage('en')}
-              className={`px-3 py-1.5 rounded-md text-[10px] font-bold transition-all duration-150 cursor-pointer ${language === 'en' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
+              onClick={() => setLocalLanguage('en')}
+              className={`px-3 py-1.5 rounded-md text-[10px] font-bold transition-all duration-150 cursor-pointer ${localLanguage === 'en' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
             >
               {t('settings.english')}
             </button>
             <button
-              onClick={() => setLanguage('zh')}
-              className={`px-3 py-1.5 rounded-md text-[10px] font-bold transition-all duration-150 cursor-pointer ${language === 'zh' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
+              onClick={() => setLocalLanguage('zh')}
+              className={`px-3 py-1.5 rounded-md text-[10px] font-bold transition-all duration-150 cursor-pointer ${localLanguage === 'zh' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
             >
               {t('settings.chinese')}
             </button>
@@ -70,7 +120,10 @@ export const Settings: React.FC = () => {
               onChange={(e) => setWorkspace(e.target.value)}
               className="flex-1 bg-white border border-slate-200 rounded-lg px-3 py-2 text-slate-800 placeholder-slate-400 focus:outline-none focus:border-slate-800 focus:ring-1 focus:ring-slate-800 transition-all duration-150 shadow-sm text-xs font-mono"
             />
-            <button className="px-3.5 py-2 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-300 rounded-lg font-bold text-xs cursor-pointer shadow-sm transition-colors duration-150">
+            <button 
+              onClick={() => alert(localLanguage === 'zh' ? '请直接在输入框中输入工作区绝对路径。' : 'Please input the absolute workspace path directly in the text box.')}
+              className="px-3.5 py-2 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-300 rounded-lg font-bold text-xs cursor-pointer shadow-sm transition-colors duration-150"
+            >
               {t('settings.browse')}
             </button>
           </div>
@@ -174,6 +227,35 @@ export const Settings: React.FC = () => {
             <li>{t('settings.step4')} <code className="text-slate-700 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200/50 font-mono">source ~/.zshrc</code>.</li>
           </ol>
         </div>
+      </div>
+
+      {/* 操作反馈与保存按钮 */}
+      <div className="border border-slate-200/80 bg-white p-6 rounded-xl flex items-center justify-between shadow-sm hover:shadow-md transition-all duration-200">
+        <div className="flex-1 mr-4">
+          {saveStatus === 'success' && (
+            <p className="text-emerald-600 font-bold flex items-center gap-1.5 animate-fade-in text-[10px]">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block animate-ping"></span>
+              {t('settings.saveSuccess')}
+            </p>
+          )}
+          {saveStatus === 'error' && (
+            <p className="text-rose-600 font-bold text-[10px]">
+              {t('settings.saveFailed', { error: errorMessage })}
+            </p>
+          )}
+          {!saveStatus && (
+            <p className="text-slate-400 text-[10px]">
+              {t('settings.workspaceDescription')}
+            </p>
+          )}
+        </div>
+        <button
+          onClick={handleSave}
+          disabled={saving}
+          className="px-6 py-2 bg-slate-900 text-white hover:bg-slate-800 disabled:bg-slate-300 rounded-lg font-bold text-xs cursor-pointer shadow-sm transition-colors duration-150 flex items-center gap-2"
+        >
+          {saving ? t('settings.saving') : t('settings.save')}
+        </button>
       </div>
     </div>
   );

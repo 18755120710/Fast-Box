@@ -1,12 +1,46 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
-import { Shield, RefreshCw, AlertCircle, CheckCircle } from 'lucide-react';
+import { Shield, RefreshCw, AlertCircle, CheckCircle, Clock } from 'lucide-react';
+import { invoke } from '@tauri-apps/api/core';
+
+interface ActivityItem {
+  title: string;
+  description: string;
+  timeAgo: string;
+  status: string; // "success" | "failed" | "running"
+}
 
 export const Home: React.FC = () => {
   const { systemInfo, packages, refreshState, t } = useApp();
+  const [activities, setActivities] = useState<ActivityItem[]>([]);
+  const [pathMissing, setPathMissing] = useState<boolean>(true);
+  const [loading, setLoading] = useState<boolean>(false);
 
   const activeNode = packages.find((p) => p.name === 'node');
   const activeVersion = activeNode?.activeVersion;
+
+  const loadHomeData = async () => {
+    try {
+      setLoading(true);
+      const acts = await invoke<ActivityItem[]>('get_recent_activities');
+      setActivities(acts);
+      const pathOk = await invoke<boolean>('check_path_status');
+      setPathMissing(!pathOk);
+    } catch (err) {
+      console.error('Failed to load dashboard metrics:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadHomeData();
+  }, [packages]);
+
+  const handleRefresh = async () => {
+    await refreshState();
+    await loadHomeData();
+  };
 
   return (
     <div className="space-y-6 animate-fade-in font-sans">
@@ -77,49 +111,58 @@ export const Home: React.FC = () => {
             <span>{t('home.activities')}</span>
           </div>
           <button
-            onClick={refreshState}
-            className="p-1 hover:bg-slate-200/80 rounded-lg text-slate-500 hover:text-slate-800 transition-colors cursor-pointer border border-transparent"
+            onClick={handleRefresh}
+            disabled={loading}
+            className="p-1 hover:bg-slate-200/80 rounded-lg text-slate-500 hover:text-slate-800 transition-colors cursor-pointer border border-transparent disabled:opacity-50"
           >
-            <RefreshCw className="h-3.5 w-3.5" />
+            <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
           </button>
         </div>
         <div className="p-6 text-xs space-y-4">
           {/* 最近历史 */}
-          <div className="flex items-start gap-3 text-slate-700">
-            <CheckCircle className="h-4.5 w-4.5 text-emerald-500 mt-0.5 flex-shrink-0" />
-            <div className="flex-1">
-              <div className="flex justify-between">
-                <span className="font-semibold text-slate-800">{t('home.shimGenerated')}</span>
-                <span className="text-[10px] text-slate-400">{t('home.justNow')}</span>
-              </div>
-              <p className="text-[10px] text-slate-500 mt-0.5">{t('home.shimGeneratedBody')}</p>
-            </div>
-          </div>
-
-          <div className="flex items-start gap-3 text-slate-700">
-            <CheckCircle className="h-4.5 w-4.5 text-emerald-500 mt-0.5 flex-shrink-0" />
-            <div className="flex-1">
-              <div className="flex justify-between">
-                <span className="font-semibold text-slate-800">{t('home.cacheUpdated')}</span>
-                <span className="text-[10px] text-slate-400">{t('home.twoHoursAgo')}</span>
-              </div>
-              <p className="text-[10px] text-slate-500 mt-0.5">{t('home.cacheUpdatedBody')}</p>
-            </div>
-          </div>
+          {activities.length === 0 ? (
+            <p className="text-slate-400 text-center py-4">{t('logs.empty')}</p>
+          ) : (
+            activities.map((act, index) => {
+              let Icon = CheckCircle;
+              let iconColor = 'text-emerald-500';
+              if (act.status === 'failed') {
+                Icon = AlertCircle;
+                iconColor = 'text-rose-500';
+              } else if (act.status === 'running') {
+                Icon = RefreshCw;
+                iconColor = 'text-blue-500 animate-spin';
+              }
+              return (
+                <div key={index} className="flex items-start gap-3 text-slate-700">
+                  <Icon className={`h-4.5 w-4.5 ${iconColor} mt-0.5 flex-shrink-0`} />
+                  <div className="flex-1">
+                    <div className="flex justify-between">
+                      <span className="font-semibold text-slate-800">{act.title}</span>
+                      <span className="text-[10px] text-slate-400">{act.timeAgo}</span>
+                    </div>
+                    <p className="text-[10px] text-slate-500 mt-0.5">{act.description}</p>
+                  </div>
+                </div>
+              );
+            })
+          )}
 
           {/* 异常警示展示 */}
-          <div className="flex items-start gap-3 border-t border-slate-100 pt-4 text-slate-700">
-            <AlertCircle className="h-4.5 w-4.5 text-amber-500 mt-0.5 flex-shrink-0" />
-            <div className="flex-1">
-              <div className="flex justify-between">
-                <span className="font-semibold text-amber-600">{t('home.pathMissing')}</span>
-                <span className="text-[10px] text-slate-400 font-medium">{t('home.warning')}</span>
+          {pathMissing && (
+            <div className="flex items-start gap-3 border-t border-slate-100 pt-4 text-slate-700 animate-fade-in">
+              <AlertCircle className="h-4.5 w-4.5 text-amber-500 mt-0.5 flex-shrink-0" />
+              <div className="flex-1">
+                <div className="flex justify-between">
+                  <span className="font-semibold text-amber-600">{t('home.pathMissing')}</span>
+                  <span className="text-[10px] text-slate-400 font-medium">{t('home.warning')}</span>
+                </div>
+                <p className="text-[10px] text-slate-500 mt-0.5 leading-relaxed">
+                  {t('home.pathMissingBody')}
+                </p>
               </div>
-              <p className="text-[10px] text-slate-500 mt-0.5 leading-relaxed">
-                {t('home.pathMissingBody')}
-              </p>
             </div>
-          </div>
+          )}
         </div>
       </div>
     </div>
