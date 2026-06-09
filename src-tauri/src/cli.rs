@@ -90,50 +90,65 @@ pub fn run_shim(bin_name: &str, passthrough_args: &[String]) -> Result<i32, Stri
 }
 
 fn list_packages_cli() -> Result<Vec<PackageStatus>, String> {
-    let node_recipe = load_package_for_cli("node")?;
-    let mut available_versions: Vec<String> = node_recipe.versions.keys().cloned().collect();
-    available_versions.sort();
+    let package_names = crate::registry::list_all_package_names_for_cli()?;
+    let mut statuses = Vec::new();
 
-    let system_version = detect_system_node_version();
-    let mut installed_versions = Vec::new();
-    if system_version.is_some() {
-        installed_versions.push("system".to_string());
-    }
+    let home = get_fastbox_home()?;
 
-    let node_install_dir = get_fastbox_home()?.join("packages").join("node");
-    if node_install_dir.exists() {
-        for entry in fs::read_dir(&node_install_dir)
-            .map_err(|e| format!("Failed to read installed versions: {}", e))?
-        {
-            let entry = entry.map_err(|e| format!("Failed to read installed version entry: {}", e))?;
-            let path = entry.path();
-            if path.is_dir() {
-                if let Some(dir_name) = path.file_name().and_then(|n| n.to_str()) {
-                    if dir_name.chars().next().is_some_and(|c| c.is_ascii_digit()) {
-                        installed_versions.push(dir_name.to_string());
+    for pkg_name in package_names {
+        let recipe = load_package_for_cli(&pkg_name)?;
+        let mut available_versions: Vec<String> = recipe.versions.keys().cloned().collect();
+        available_versions.sort();
+
+        let system_version = if pkg_name == "node" {
+            detect_system_node_version()
+        } else {
+            None
+        };
+
+        let mut installed_versions = Vec::new();
+        if system_version.is_some() {
+            installed_versions.push("system".to_string());
+        }
+
+        let install_dir = home.join("packages").join(&pkg_name);
+        if install_dir.exists() {
+            for entry in fs::read_dir(&install_dir)
+                .map_err(|e| format!("Failed to read installed versions for {}: {}", pkg_name, e))?
+            {
+                let entry = entry.map_err(|e| format!("Failed to read installed version entry for {}: {}", pkg_name, e))?;
+                let path = entry.path();
+                if path.is_dir() {
+                    if let Some(dir_name) = path.file_name().and_then(|n| n.to_str()) {
+                        if dir_name.chars().next().map_or(false, |c| c.is_ascii_digit()) {
+                            installed_versions.push(dir_name.to_string());
+                        }
                     }
                 }
             }
         }
+        installed_versions.sort();
+
+        let status = if installed_versions.is_empty() {
+            "not_installed".to_string()
+        } else {
+            "installed".to_string()
+        };
+
+        statuses.push(PackageStatus {
+            name: recipe.name,
+            display_name: recipe.display_name,
+            installed_versions,
+            active_version: get_active_version(&pkg_name),
+            available_versions,
+            status,
+            system_version,
+        });
     }
-    installed_versions.sort();
 
-    let status = if installed_versions.is_empty() {
-        "not_installed".to_string()
-    } else {
-        "installed".to_string()
-    };
-
-    Ok(vec![PackageStatus {
-        name: node_recipe.name,
-        display_name: node_recipe.display_name,
-        installed_versions,
-        active_version: get_active_version("node"),
-        available_versions,
-        status,
-        system_version,
-    }])
+    Ok(statuses)
 }
+
 
 async fn install_package_cli(name: &str, version: &str) -> Result<(), String> {
     let recipe = load_package_for_cli(name)?;

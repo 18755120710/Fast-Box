@@ -212,52 +212,66 @@ pub async fn get_system_info() -> Result<SystemInfo, String> {
 
 #[tauri::command]
 pub async fn list_packages(app_handle: tauri::AppHandle) -> Result<Vec<PackageStatus>, String> {
-    let node_recipe = load_package_from_registry(&app_handle, "node")?;
-    let mut available_versions: Vec<String> = node_recipe.versions.keys().cloned().collect();
-    available_versions.sort();
+    let package_names = crate::registry::list_all_package_names(&app_handle)?;
+    let mut statuses = Vec::new();
 
     let home = get_fastbox_home()?;
-    let node_install_dir = home.join("packages").join("node");
 
-    let system_version = detect_system_node_version();
-    let mut installed_versions = Vec::new();
-    if system_version.is_some() {
-        installed_versions.push("system".to_string());
-    }
+    for pkg_name in package_names {
+        let recipe = load_package_from_registry(&app_handle, &pkg_name)?;
+        let mut available_versions: Vec<String> = recipe.versions.keys().cloned().collect();
+        available_versions.sort();
 
-    if node_install_dir.exists() && node_install_dir.is_dir() {
-        if let Ok(entries) = fs::read_dir(node_install_dir) {
-            for entry in entries.flatten() {
-                let path = entry.path();
-                if path.is_dir() {
-                    if let Some(dir_name) = path.file_name().and_then(|n| n.to_str()) {
-                        if dir_name.chars().next().map_or(false, |c| c.is_ascii_digit()) {
-                            installed_versions.push(dir_name.to_string());
+        let install_dir = home.join("packages").join(&pkg_name);
+
+        let system_version = if pkg_name == "node" {
+            detect_system_node_version()
+        } else {
+            None
+        };
+
+        let mut installed_versions = Vec::new();
+        if system_version.is_some() {
+            installed_versions.push("system".to_string());
+        }
+
+        if install_dir.exists() && install_dir.is_dir() {
+            if let Ok(entries) = fs::read_dir(install_dir) {
+                for entry in entries.flatten() {
+                    let path = entry.path();
+                    if path.is_dir() {
+                        if let Some(dir_name) = path.file_name().and_then(|n| n.to_str()) {
+                            if dir_name.chars().next().map_or(false, |c| c.is_ascii_digit()) {
+                                installed_versions.push(dir_name.to_string());
+                            }
                         }
                     }
                 }
             }
         }
+        installed_versions.sort();
+
+        let active_version = get_active_version(&pkg_name);
+        let status = if installed_versions.is_empty() {
+            "not_installed".to_string()
+        } else {
+            "installed".to_string()
+        };
+
+        statuses.push(PackageStatus {
+            name: recipe.name,
+            display_name: recipe.display_name,
+            installed_versions,
+            active_version,
+            available_versions,
+            status,
+            system_version,
+        });
     }
-    installed_versions.sort();
 
-    let active_version = get_active_version("node");
-    let status = if installed_versions.is_empty() {
-        "not_installed".to_string()
-    } else {
-        "installed".to_string()
-    };
-
-    Ok(vec![PackageStatus {
-        name: node_recipe.name,
-        display_name: node_recipe.display_name,
-        installed_versions,
-        active_version,
-        available_versions,
-        status,
-        system_version,
-    }])
+    Ok(statuses)
 }
+
 
 #[tauri::command]
 pub async fn install_package_version(

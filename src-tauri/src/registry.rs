@@ -78,6 +78,113 @@ pub fn load_package_for_cli(name: &str) -> Result<RegistryPackage, String> {
     load_package_from_path(&package_path, name)
 }
 
+pub fn list_all_package_names_for_cli() -> Result<Vec<String>, String> {
+    let mut names = std::collections::HashSet::new();
+
+    if let Ok(home) = get_fastbox_home() {
+        let home_packages_dir = home.join("registry").join("packages");
+        if home_packages_dir.exists() && home_packages_dir.is_dir() {
+            if let Ok(entries) = fs::read_dir(home_packages_dir) {
+                for entry in entries.flatten() {
+                    let path = entry.path();
+                    if path.is_file() && path.extension().map_or(false, |ext| ext == "json") {
+                        if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
+                            names.insert(stem.to_string());
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    let dev_packages_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("..")
+        .join("fast-box-registry")
+        .join("packages");
+    if dev_packages_dir.exists() && dev_packages_dir.is_dir() {
+        if let Ok(entries) = fs::read_dir(dev_packages_dir) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.is_file() && path.extension().map_or(false, |ext| ext == "json") {
+                    if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
+                        names.insert(stem.to_string());
+                    }
+                }
+            }
+        }
+    }
+
+    if names.is_empty() {
+        names.insert("node".to_string());
+    }
+
+    let mut result: Vec<String> = names.into_iter().collect();
+    result.sort();
+    Ok(result)
+}
+
+pub fn list_all_package_names(app_handle: &tauri::AppHandle) -> Result<Vec<String>, String> {
+    let mut names = std::collections::HashSet::new();
+
+    if let Ok(home) = get_fastbox_home() {
+        let home_packages_dir = home.join("registry").join("packages");
+        if home_packages_dir.exists() && home_packages_dir.is_dir() {
+            if let Ok(entries) = fs::read_dir(home_packages_dir) {
+                for entry in entries.flatten() {
+                    let path = entry.path();
+                    if path.is_file() && path.extension().map_or(false, |ext| ext == "json") {
+                        if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
+                            names.insert(stem.to_string());
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    let dev_packages_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("..")
+        .join("fast-box-registry")
+        .join("packages");
+    if dev_packages_dir.exists() && dev_packages_dir.is_dir() {
+        if let Ok(entries) = fs::read_dir(dev_packages_dir) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.is_file() && path.extension().map_or(false, |ext| ext == "json") {
+                    if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
+                        names.insert(stem.to_string());
+                    }
+                }
+            }
+        }
+    }
+
+    if let Ok(resource_dir) = app_handle.path().resource_dir() {
+        let res_packages_dir = resource_dir.join("fast-box-registry").join("packages");
+        if res_packages_dir.exists() && res_packages_dir.is_dir() {
+            if let Ok(entries) = fs::read_dir(res_packages_dir) {
+                for entry in entries.flatten() {
+                    let path = entry.path();
+                    if path.is_file() && path.extension().map_or(false, |ext| ext == "json") {
+                        if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
+                            names.insert(stem.to_string());
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if names.is_empty() {
+        names.insert("node".to_string());
+    }
+
+    let mut result: Vec<String> = names.into_iter().collect();
+    result.sort();
+    Ok(result)
+}
+
+
 fn load_package_from_path(package_path: &PathBuf, name: &str) -> Result<RegistryPackage, String> {
     let content = fs::read_to_string(&package_path)
         .map_err(|e| format!("Failed to read registry file for {} at {:?}: {}", name, package_path, e))?;
