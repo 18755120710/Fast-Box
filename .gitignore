@@ -17,7 +17,7 @@ target/
 .env.*
 
 # Separate registry repository
-fast-box-registry/
+
 
 # E2E test fixtures and outputs
 tests/e2e/fixtures/

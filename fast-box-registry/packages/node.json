@@ -1,0 +1,108 @@
+{
+  "$schema": "../schemas/package.schema.json",
+  "name": "node",
+  "displayName": "Node.js",
+  "description": "Node.js JavaScript runtime with npm and npx.",
+  "homepage": "https://nodejs.org/",
+  "license": "MIT",
+  "installMode": "archive",
+  "managedInstallPath": "{fastbox_home}/packages/node/{version}",
+  "defaultVersion": "24.16.0",
+  "channels": {
+    "lts": "24.16.0"
+  },
+  "versions": {
+    "24.16.0": {
+      "version": "24.16.0",
+      "channel": "lts",
+      "codename": "Krypton",
+      "platforms": {
+        "macos-arm64": {
+          "os": "macos",
+          "arch": "arm64",
+          "archiveType": "tar.xz",
+          "fileName": "node-v24.16.0-darwin-arm64.tar.xz",
+          "officialUrl": "https://nodejs.org/dist/v24.16.0/node-v24.16.0-darwin-arm64.tar.xz",
+          "mirrorUrls": [
+            "https://mirrors.huaweicloud.com/nodejs/v24.16.0/node-v24.16.0-darwin-arm64.tar.xz"
+          ],
+          "sha256": "e28ad5531b2aafe0ea555a51b2412c42fdc0f91a6a53fbd03ac93e3847e91389",
+          "archiveRoot": "node-v24.16.0-darwin-arm64"
+        },
+        "macos-x64": {
+          "os": "macos",
+          "arch": "x64",
+          "archiveType": "tar.xz",
+          "fileName": "node-v24.16.0-darwin-x64.tar.xz",
+          "officialUrl": "https://nodejs.org/dist/v24.16.0/node-v24.16.0-darwin-x64.tar.xz",
+          "mirrorUrls": [
+            "https://mirrors.huaweicloud.com/nodejs/v24.16.0/node-v24.16.0-darwin-x64.tar.xz"
+          ],
+          "sha256": "6b144acbcfdbca75a1366100ff96e6bf6a4fe666b88a4bda7bfbd0299c82cca2",
+          "archiveRoot": "node-v24.16.0-darwin-x64"
+        },
+        "windows-x64": {
+          "os": "windows",
+          "arch": "x64",
+          "archiveType": "zip",
+          "fileName": "node-v24.16.0-win-x64.zip",
+          "officialUrl": "https://nodejs.org/dist/v24.16.0/node-v24.16.0-win-x64.zip",
+          "mirrorUrls": [
+            "https://mirrors.huaweicloud.com/nodejs/v24.16.0/node-v24.16.0-win-x64.zip"
+          ],
+          "sha256": "edaca9bd58ec8e92037dac4e877d52f6b8f430b81c18b57e264b4e2fb111cd56",
+          "archiveRoot": "node-v24.16.0-win-x64"
+        }
+      },
+      "verify": [
+        {
+          "command": "node --version",
+          "expectedPrefix": "v24.16.0"
+        },
+        {
+          "command": "npm --version"
+        },
+        {
+          "command": "npx --version"
+        }
+      ],
+      "sources": {
+        "releasePage": "https://nodejs.org/dist/latest-v24.x/",
+        "shasums": "https://nodejs.org/dist/latest-v24.x/SHASUMS256.txt",
+        "domesticMirror": "https://mirrors.huaweicloud.com/nodejs/latest-v24.x/"
+      }
+    }
+  },
+  "bins": [
+    {
+      "name": "node",
+      "relativePath": "bin/node",
+      "windowsRelativePath": "node.exe"
+    },
+    {
+      "name": "npm",
+      "relativePath": "bin/npm",
+      "windowsRelativePath": "npm.cmd"
+    },
+    {
+      "name": "npx",
+      "relativePath": "bin/npx",
+      "windowsRelativePath": "npx.cmd"
+    }
+  ],
+  "postInstall": {
+    "npmRegistry": "https://registry.npmmirror.com"
+  },
+  "activation": {
+    "strategy": "shimActiveVersion",
+    "statePath": "{fastbox_home}/state/active.json",
+    "desktopAction": "setActiveVersion",
+    "optionalCliCommand": "fastbox use node@{version}"
+  },
+  "uninstall": {
+    "strategy": "removeManagedVersionDirectoryAndRefreshShims",
+    "removePaths": [
+      "{fastbox_home}/packages/node/{version}"
+    ]
+  }
+}

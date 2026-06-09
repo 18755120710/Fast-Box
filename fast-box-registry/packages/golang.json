@@ -1,0 +1,62 @@
+{
+  "$schema": "../schemas/package.schema.json",
+  "name": "golang",
+  "displayName": "Go Compiler",
+  "description": "Go is an open source programming language that makes it easy to build simple, reliable, and efficient software.",
+  "homepage": "https://go.dev/",
+  "license": "BSD-3-Clause",
+  "installMode": "archive",
+  "managedInstallPath": "{fastbox_home}/packages/golang/{version}",
+  "defaultVersion": "1.22.0",
+  "channels": {
+    "stable": "1.22.0"
+  },
+  "versions": {
+    "1.22.0": {
+      "version": "1.22.0",
+      "channel": "stable",
+      "platforms": {
+        "macos-arm64": {
+          "os": "macos",
+          "arch": "arm64",
+          "archiveType": "tar.gz",
+          "fileName": "go1.22.0.darwin-arm64.tar.gz",
+          "officialUrl": "https://go.dev/dl/go1.22.0.darwin-arm64.tar.gz",
+          "mirrorUrls": [],
+          "sha256": "bf8e388b09134164717cd52d3285a4ab3b68691b80515212da0e9f56f518fb1e",
+          "archiveRoot": "go"
+        }
+      },
+      "verify": [
+        {
+          "command": "go version",
+          "expectedPrefix": "go version go1.22.0"
+        }
+      ]
+    }
+  },
+  "bins": [
+    {
+      "name": "go",
+      "relativePath": "bin/go",
+      "windowsRelativePath": "bin/go.exe"
+    },
+    {
+      "name": "gofmt",
+      "relativePath": "bin/gofmt",
+      "windowsRelativePath": "bin/gofmt.exe"
+    }
+  ],
+  "activation": {
+    "strategy": "shimActiveVersion",
+    "statePath": "{fastbox_home}/state/active.json",
+    "desktopAction": "setActiveVersion",
+    "optionalCliCommand": "fastbox use golang@{version}"
+  },
+  "uninstall": {
+    "strategy": "removeManagedVersionDirectoryAndRefreshShims",
+    "removePaths": [
+      "{fastbox_home}/packages/golang/{version}"
+    ]
+  }
+}

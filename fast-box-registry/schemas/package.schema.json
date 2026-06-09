@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Fast Box Package",
+  "type": "object",
+  "required": [
+    "name",
+    "displayName",
+    "installMode",
+    "managedInstallPath",
+    "defaultVersion",
+    "versions",
+    "bins"
+  ],
+  "properties": {
+    "name": {
+      "type": "string"
+    },
+    "displayName": {
+      "type": "string"
+    },
+    "description": {
+      "type": "string"
+    },
+    "channel": {
+      "type": "string"
+    },
+    "defaultVersion": {
+      "type": "string"
+    },
+    "channels": {
+      "type": "object"
+    },
+    "homepage": {
+      "type": "string"
+    },
+    "license": {
+      "type": "string"
+    },
+    "installMode": {
+      "type": "string",
+      "enum": ["archive", "installer", "container", "manual"]
+    },
+    "managedInstallPath": {
+      "type": "string"
+    },
+    "versions": {
+      "type": "object"
+    },
+    "bins": {
+      "type": "array"
+    },
+    "postInstall": {
+      "type": "object"
+    },
+    "activation": {
+      "type": "object"
+    },
+    "verify": {
+      "type": "array"
+    },
+    "uninstall": {
+      "type": "object"
+    },
+    "sources": {
+      "type": "object"
+    }
+  }
+}

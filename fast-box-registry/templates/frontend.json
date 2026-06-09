@@ -1,0 +1,18 @@
+{
+  "name": "frontend",
+  "displayName": "前端开发环境",
+  "description": "适合前端入门和常规 Web 开发的基础环境。",
+  "packages": [
+    {
+      "name": "node",
+      "version": "24.16.0",
+      "channel": "lts"
+    }
+  ],
+  "verify": [
+    "node --version",
+    "npm --version",
+    "npx --version"
+  ]
+}
+
