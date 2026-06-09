@@ -58,6 +58,10 @@ pub fn run() {
             commands::save_settings,
             commands::get_recent_activities,
             commands::check_path_status,
+            commands::get_storage_usage,
+            commands::clean_cache,
+            commands::clean_logs,
+            commands::auto_configure_path,
         ])
 
 

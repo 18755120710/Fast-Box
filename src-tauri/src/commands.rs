@@ -988,6 +988,135 @@ pub async fn save_settings(settings: crate::config::AppSettings) -> Result<(), S
     Ok(())
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct StorageUsage {
+    pub packages_size: u64,
+    pub cache_size: u64,
+    pub logs_size: u64,
+    pub total_size: u64,
+}
+
+fn get_dir_size<P: AsRef<Path>>(path: P) -> u64 {
+    let mut size = 0;
+    if let Ok(entries) = fs::read_dir(path) {
+        for entry in entries.flatten() {
+            let p = entry.path();
+            if p.is_file() {
+                if let Ok(metadata) = fs::metadata(&p) {
+                    size += metadata.len();
+                }
+            } else if p.is_dir() {
+                size += get_dir_size(&p);
+            }
+        }
+    }
+    size
+}
+
+#[tauri::command]
+pub async fn get_storage_usage() -> Result<StorageUsage, String> {
+    let home = get_fastbox_home()?;
+    let packages_size = get_dir_size(home.join("packages"));
+    let cache_size = get_dir_size(home.join("cache"));
+    let logs_size = get_dir_size(home.join("logs"));
+    let total_size = packages_size + cache_size + logs_size;
+
+    Ok(StorageUsage {
+        packages_size,
+        cache_size,
+        logs_size,
+        total_size,
+    })
+}
+
+#[tauri::command]
+pub async fn clean_cache() -> Result<u64, String> {
+    let home = get_fastbox_home()?;
+    let cache_dir = home.join("cache");
+    let size_removed = get_dir_size(&cache_dir);
+    if cache_dir.exists() {
+        let _ = fs::remove_dir_all(&cache_dir);
+        let _ = fs::create_dir_all(&cache_dir); // 重建缓存空目录
+    }
+    Ok(size_removed)
+}
+
+#[tauri::command]
+pub async fn clean_logs() -> Result<u64, String> {
+    let home = get_fastbox_home()?;
+    let logs_dir = home.join("logs");
+    let mut size_removed = 0;
+    if logs_dir.exists() && logs_dir.is_dir() {
+        if let Ok(entries) = fs::read_dir(&logs_dir) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.is_file() {
+                    if let Some(file_name) = path.file_name().and_then(|n| n.to_str()) {
+                        if file_name.starts_with("install-") {
+                            if let Ok(meta) = fs::metadata(&path) {
+                                size_removed += meta.len();
+                            }
+                            let _ = fs::remove_file(path);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    Ok(size_removed)
+}
+
+#[tauri::command]
+pub async fn auto_configure_path() -> Result<String, String> {
+    let home = get_fastbox_home()?;
+    let shims_dir = home.join("shims");
+    let shims_dir_str = shims_dir.to_string_lossy().to_string();
+
+    let shell_var = std::env::var("SHELL").unwrap_or_default();
+    let config_file = if shell_var.contains("zsh") {
+        dirs::home_dir().map(|h| h.join(".zshrc"))
+    } else if shell_var.contains("bash") {
+        dirs::home_dir().map(|h| h.join(".bash_profile"))
+    } else {
+        None
+    };
+
+    let config_file_path = config_file.ok_or_else(|| {
+        "未检测到支持的 Shell 类型 (Zsh/Bash)，请参考“设置”页面中的指南手动添加环境变量。".to_string()
+    })?;
+
+    let content = if config_file_path.exists() {
+        fs::read_to_string(&config_file_path).map_err(|e| format!("读取 shell 配置失败: {}", e))?
+    } else {
+        String::new()
+    };
+
+    if content.contains(".fastbox/shims") || content.contains(&shims_dir_str) {
+        return Ok("您的 Shell 配置文件中已配置过 Fast Box 环境变量，无需重复操作。".to_string());
+    }
+
+    let export_line = format!(
+        "\n# Fast Box environment variables\nexport PATH=\"{}/shims:$PATH\"\n",
+        home.to_string_lossy()
+    );
+
+    use std::io::Write;
+    let mut file = fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&config_file_path)
+        .map_err(|e| format!("打开 shell 配置失败: {}", e))?;
+
+    writeln!(file, "{}", export_line).map_err(|e| format!("追加配置到 shell 失败: {}", e))?;
+
+    let file_name = config_file_path.file_name().and_then(|f| f.to_str()).unwrap_or("配置");
+    Ok(format!(
+        "已成功将 PATH 追加配置到 ~/{}. 请重启当前运行的所有终端（或运行 'source ~/{}'）以激活全局代理命令！",
+        file_name, file_name
+    ))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
