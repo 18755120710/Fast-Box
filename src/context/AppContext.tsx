@@ -224,6 +224,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
   };
 
+  // 监听任务状态，在安装成功或失败后自动同步刷新本地包状态
+  useEffect(() => {
+    if (activeTask.status === 'success' || activeTask.status === 'failed') {
+      refreshState();
+    }
+  }, [activeTask.status]);
+
   return (
     <AppContext.Provider
       value={{
@@ -244,6 +251,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     </AppContext.Provider>
   );
 };
+
 
 export const useApp = () => {
   const context = useContext(AppContext);
