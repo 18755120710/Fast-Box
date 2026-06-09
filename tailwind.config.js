@@ -7,14 +7,15 @@ export default {
   theme: {
     extend: {
       colors: {
-        background: "#0F172A", // 极简暗色背景
+        background: "#F8FAFC", // 亮色背景，极简高质感
         accent: {
-          DEFAULT: "#22C55E", // 绿色强调色
-          hover: "#16A34A",
+          DEFAULT: "#10B981", // 绿色状态色，表示成功、激活等
+          hover: "#059669",
         },
       },
       fontFamily: {
-        mono: ['"Space Mono"', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', 'monospace'],
+        sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
+        mono: ['"Space Mono"', 'ui-monospace', 'monospace'],
       },
     },
   },
