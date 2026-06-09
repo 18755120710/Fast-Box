@@ -60,9 +60,12 @@ export const EnvDetail: React.FC<{ packageName: string }> = ({ packageName }) =>
     setLoadingAction(`uninstall-${version}`);
     setError(null);
     try {
-      await invoke('uninstall_package_version', { name: packageName, version });
+      const msg = await invoke<string>('uninstall_package_version', { name: packageName, version });
       await refreshState();
       setVerifyResults(null);
+      if (msg) {
+        alert(msg);
+      }
     } catch (err: any) {
       setError(t('detail.uninstallError', { error: String(err) }));
     } finally {
