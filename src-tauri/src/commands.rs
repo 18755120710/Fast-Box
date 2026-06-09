@@ -903,7 +903,7 @@ pub async fn get_recent_activities() -> Result<Vec<ActivityItem>, String> {
                                 format!("{} 天前", mins / 1440)
                             };
 
-                            let status = if let Ok(content) = fs::read_to_string(&path) {
+                            let mut status = if let Ok(content) = fs::read_to_string(&path) {
                                 if content.contains("[SYSTEM] 安装全流程校验通过") || content.contains("completed") {
                                     "success".to_string()
                                 } else if content.contains("[ERROR]") || content.contains("failed") {
@@ -915,11 +915,20 @@ pub async fn get_recent_activities() -> Result<Vec<ActivityItem>, String> {
                                 "success".to_string()
                             };
 
+                            let is_interrupted = status == "running" && duration.as_secs() > 120;
+                            if is_interrupted {
+                                status = "failed".to_string();
+                            }
+
                             let title = format!("安装 {} v{}", pkg_name, version);
                             let description = if status == "success" {
                                 format!("软件包 {} v{} 下载、校验并解压安装成功", pkg_name, version)
                             } else if status == "failed" {
-                                format!("软件包 {} v{} 安装失败，详情请查看日志文件", pkg_name, version)
+                                if is_interrupted {
+                                    format!("软件包 {} v{} 安装已被中断（可能重启了程序）", pkg_name, version)
+                                } else {
+                                    format!("软件包 {} v{} 安装失败，详情请查看日志文件", pkg_name, version)
+                                }
                             } else {
                                 format!("正在执行 {} v{} 的安装流程", pkg_name, version)
                             };

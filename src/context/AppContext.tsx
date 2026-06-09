@@ -87,23 +87,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     refreshState();
 
     // 监听全局包安装进度事件
-    const unlistenProgress = listen<{ task_id: string; stage: string; progress: number; message: string; package_name?: string }>(
+    const unlistenProgress = listen<{ taskId: string; stage: string; progress: number; message: string; packageName?: string }>(
       'install-progress',
       (event) => {
         if (!isMounted) return;
-        const { task_id, stage, progress, message } = event.payload;
+        const { taskId, stage, progress, message, packageName } = event.payload;
         setActiveTask((prev) => {
-          const isMatch = prev.taskId === task_id || (
+          const isMatch = prev.taskId === taskId || (
             !prev.taskId && prev.packageName && (
-              event.payload.package_name === prev.packageName ||
+              packageName === prev.packageName ||
               (event.payload as any).name === prev.packageName ||
-              task_id.startsWith(`task_${prev.packageName}_`)
+              (taskId && taskId.startsWith(`task_${prev.packageName}_`))
             )
           );
           if (isMatch) {
             return {
               ...prev,
-              taskId: prev.taskId || task_id,
+              taskId: prev.taskId || taskId,
               stage,
               progress,
               status: progress === 100 ? 'success' : 'running',
@@ -116,21 +116,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     );
 
     // 监听实时日志流事件
-    const unlistenLog = listen<{ task_id: string; message: string; package_name?: string }>('install-log', (event) => {
+    const unlistenLog = listen<{ taskId: string; message: string; packageName?: string }>('install-log', (event) => {
       if (!isMounted) return;
-      const { task_id, message } = event.payload;
+      const { taskId, message, packageName } = event.payload;
       setActiveTask((prev) => {
-        const isMatch = prev.taskId === task_id || (
+        const isMatch = prev.taskId === taskId || (
           !prev.taskId && prev.packageName && (
-            event.payload.package_name === prev.packageName ||
+            packageName === prev.packageName ||
             (event.payload as any).name === prev.packageName ||
-            task_id.startsWith(`task_${prev.packageName}_`)
+            (taskId && taskId.startsWith(`task_${prev.packageName}_`))
           )
         );
         if (isMatch) {
           return {
             ...prev,
-            taskId: prev.taskId || task_id,
+            taskId: prev.taskId || taskId,
             logs: [...prev.logs, message].slice(-1000)
           };
         }
