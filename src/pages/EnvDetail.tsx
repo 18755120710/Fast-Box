@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useApp } from '../context/AppContext';
 import { invoke } from '@tauri-apps/api/core';
 import { ArrowLeft, CheckCircle2, Trash2, ShieldCheck } from 'lucide-react';
@@ -265,8 +266,8 @@ export const EnvDetail: React.FC<{ packageName: string }> = ({ packageName }) =>
           })}
         </div>
       </div>
-      {confirmUninstallVersion && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 animate-fade-in animate-duration-150">
+      {confirmUninstallVersion && createPortal(
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-[9999] animate-fade-in animate-duration-150">
           <div className="bg-white border border-slate-100 rounded-xl p-6 max-w-sm w-full mx-4 shadow-xl space-y-4 animate-scale-in">
             <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
               <Trash2 className="h-4 w-4 text-red-500" />
@@ -290,7 +291,8 @@ export const EnvDetail: React.FC<{ packageName: string }> = ({ packageName }) =>
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
